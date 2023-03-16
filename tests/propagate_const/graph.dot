@@ -1,0 +1,3 @@
+digraph g {
+   N1 [shape=record, label="{Const: 252}"];
+}

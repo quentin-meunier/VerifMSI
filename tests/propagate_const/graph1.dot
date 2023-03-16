@@ -1,0 +1,9 @@
+digraph g {
+   N6 [shape=record, label="{Op: ^ (num 6)}"];
+   edge[tailclip=true];
+   N6 -> N3
+   edge[tailclip=true];
+   N6 -> N0
+   N0 [shape=record, label="{Symbol: s0 [S]}"];
+   N3 [shape=record, label="{Symbol: m1 [M]}"];
+}
