@@ -382,14 +382,12 @@ def masked_aes(key, pt, ct, mask):
 
     simplify_state(x)
     print('# End of AES')
-    print('# Total Nb. of expression analysed: %d' % nbExps)
-    print('# Total Nb. of expression leaking: %d' % nbLeak)
     # Writing output ciphered text
     for i in range(16):
         ct[i] = x[i]
 
 
-if __name__ == '__main__':
+def aes_sm():
 
     registerArray('sbox', 8, 8, None, 256, None, sbox)
     registerArray('sboxp', 8, 8, None, 256, sboxp_func, None)
@@ -442,5 +440,14 @@ if __name__ == '__main__':
     if testLitteral:
         print('Cyphered text (Masked AES): ', end = '')
         display_vector(ct)
+    
+    global nbLeak, nbExps
+    return nbLeak, nbExps
+
+
+if __name__ == '__main__':
+    nbLeak, nbExps = aes_sm()
+    print('# Total Nb. of expression analysed: %d' % nbExps)
+    print('# Total Nb. of potential leakages found: %d' % nbLeak)
 
 

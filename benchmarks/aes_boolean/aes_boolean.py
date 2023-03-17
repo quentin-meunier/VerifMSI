@@ -22,7 +22,6 @@ def checkExpLeakage(e):
     if not res:
         nbLeak += 1
         print('# Leakage in value for exp num %d: %s' % (nbExps, e))
-        #sys.exit(0)
 
 
 rand_cnt = 0
@@ -671,7 +670,7 @@ def exp_func(mem, e):
 
 
 
-if __name__ == '__main__':
+def aes_boolean():
 
     registerArray('linear_sbox_t', 8, 8, None, 256, None, linear_sbox_t)
     registerArray('log_t', 8, 32, None, 256, log_func, log_t)
@@ -721,6 +720,15 @@ if __name__ == '__main__':
     if test_litteral:
         print('Cyphered text (Masked AES): ', end = '')
         display_vector(ct)
+
+    global nbLeak, nbExps
+    return nbLeak, nbExps
+
+
+if __name__ == '__main__':
+    nbLeak, nbExps = aes_boolean()
+    print('# Total Nb. of expression analysed: %d' % nbExps)
+    print('# Total Nb. of potential leakages found: %d' % nbLeak)
 
 
 

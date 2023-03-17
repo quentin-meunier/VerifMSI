@@ -26,7 +26,6 @@ def checkExpLeakage(e):
     if not res:
         nbLeak += 1
         print('# Leakage in value for exp num %d' % (nbExps))
-        sys.exit(0)
 
 
 
@@ -587,12 +586,10 @@ def masked_aes(key, pt, ct, m, mp, mt):
         #checkExpLeakage(e) # leaks because masks have been removed
         ct[i] = e
     print('# End of AES')
-    print('# Total Nb. of expression analysed: %d' % nbExps)
-    print('# Total Nb. of expression leaking: %d' % nbLeak)
 
 
 
-if __name__ == '__main__':
+def aes_herbst():
 
     registerArray('sbox', 8, 8, None, 256, None, sbox)
 
@@ -645,5 +642,17 @@ if __name__ == '__main__':
         ct = {}
         
         masked_aes(key, pt, ct, m, mp, mt)
+
+    global nbLeak, nbExps
+    return nbLeak, nbExps
+
+
+if __name__ == '__main__':
+    nbLeak, nbExps = aes_herbst()
+    print('# Total Nb. of expression analysed: %d' % nbExps)
+    print('# Total Nb. of potential leakages found: %d' % nbLeak)
+
+
+
 
 

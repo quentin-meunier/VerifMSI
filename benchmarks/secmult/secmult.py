@@ -131,12 +131,13 @@ def secmult():
         print('c1 = 0x%x' % int(str(c1)))
         print('c0 ^ c1 = 0x%x' % (int(str(simp(c0 ^ c1)))))
         print('k0 * k1 = 0x%x' % (int(str(gmul(k0, k1)))))
+    
+    global nbLeak, nbExps
+    return nbLeak, nbExps
 
 
 if __name__ == '__main__':
-    nbExps = 0
-    nbLeak = 0
-    secmult()
+    nbLeak, nbExps = secmult()
     print('# Total Nb. of expression analysed: %d' % nbExps)
     print('# Total Nb. of potential leakages found: %d' % nbLeak)
 
