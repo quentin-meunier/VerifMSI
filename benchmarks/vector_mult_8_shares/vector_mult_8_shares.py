@@ -9,8 +9,8 @@ from __future__ import print_function
 from verif_msi import *
 
 
-nbCheck = 0
 nbLeak = 0
+nbExps = 0
 
 
 class Register:
@@ -19,18 +19,18 @@ class Register:
         self.newVal = None
 
     def setVal(self, val):
-        global nbCheck
+        global nbExps
         global nbLeak
         self.val = val
 
         if self.oldVal == None:
             self.oldVal = constant(0, self.val.width)
         
-        nbCheck += 1
+        nbExps += 1
         res, wordRes, niTime = checkTpsTrans(self.oldVal, self.val)
         if not res:
             nbLeak += 1
-            print('# Leakage in transition for check %d (Total leaks : %d)' % (nbCheck, nbLeak))
+            print('# Leakage in transition for check %d (Total leaks : %d)' % (nbExps, nbLeak))
         self.oldVal = self.val
 
 
@@ -83,7 +83,7 @@ def compute(x, y, r, u, v):
 
 
 
-def vectorMult4Shares():
+def vector_mult_8_shares():
 
     testLitteral = False
 
@@ -186,12 +186,14 @@ def vectorMult4Shares():
         print('# x & y = %s' % res)
         print('# z     = %s' % z)
 
+    global nbLeak, nbExps
+    return nbLeak, nbExps
+
+
 
 if __name__ == '__main__':
-    nbCheck = 0
-    nbLeak = 0
-    vectorMult4Shares()
-    print('# Total Nb. of expression analysed: %d' % nbCheck)
+    nbLeak, nbExps = vector_mult_8_shares()
+    print('# Total Nb. of expressions analysed: %d' % nbExps)
     print('# Total Nb. of potential leakages found: %d' % nbLeak)
 
 

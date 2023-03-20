@@ -89,7 +89,7 @@ def checkPINIVal(e, maxShareOcc, outputIndexes):
 
 
 
-def checkPropTrans(e0, e1):
+def checkPropTrans(e0, e1, secProp, maxShareOcc):
     tpsTimerStart = timeit.default_timer()
 
     e = Concat(e0, e1)
@@ -144,14 +144,14 @@ def checkPropTrans(e0, e1):
 
 
 
-def checkTpsTrans(e):
-    return checkPropTrans(e, 'tps', None)
+def checkTpsTrans(e0, e1):
+    return checkPropTrans(e0, e1, 'tps', None)
 
-def checkNITrans(e, maxShareOcc):
-    return checkPropTrans(e, 'ni', maxShareOcc)
+def checkNITrans(e0, e1, maxShareOcc):
+    return checkPropTrans(e0, e1, 'ni', maxShareOcc)
 
-def checkRNITrans(e, maxShareOcc):
-    return checkPropTrans(e, 'rni', maxShareOcc)
+def checkRNITrans(e0, e1, maxShareOcc):
+    return checkPropTrans(e0, e1, 'rni', maxShareOcc)
 
 
 
