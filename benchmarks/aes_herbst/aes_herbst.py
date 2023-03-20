@@ -649,7 +649,7 @@ def aes_herbst():
 
 if __name__ == '__main__':
     nbLeak, nbExps = aes_herbst()
-    print('# Total Nb. of expression analysed: %d' % nbExps)
+    print('# Total Nb. of expressions analysed: %d' % nbExps)
     print('# Total Nb. of potential leakages found: %d' % nbLeak)
 
 

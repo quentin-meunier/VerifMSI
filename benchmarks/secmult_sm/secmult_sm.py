@@ -64,12 +64,13 @@ def secmult():
     c1 = simplify(c1)
     checkExpLeakage(c1)
 
+    global nbLeak, nbExps
+    return nbLeak, nbExps
+
 
 if __name__ == '__main__':
-    nbExps = 0
-    nbLeak = 0
-    secmult()
-    print('# Total Nb. of expression analysed: %d' % nbExps)
+    nbLeak, nbExps = secmult()
+    print('# Total Nb. of expressions analysed: %d' % nbExps)
     print('# Total Nb. of potential leakages found: %d' % nbLeak)
 
 
