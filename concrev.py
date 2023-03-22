@@ -1,14 +1,10 @@
-#!/usr/bin/python
-
-# Copyright (C) 2021, Sorbonne Universite, LIP6
-# This file is part of the Muse project, under the GPL v3.0 license
+# Copyright (C) 2023, Sorbonne Universite, LIP6
+# This file is part of the VerifMSI project, under the GPL v3.0 license
 # See https://www.gnu.org/licenses/gpl-3.0.en.html for license information
 # SPDX-License-Identifier: GPL-3.0-only
 # Author(s): Quentin L. Meunier
 
 # Concrete Evaluation
-
-from __future__ import print_function
 
 from .utils import *
 from .node import *

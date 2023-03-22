@@ -1,27 +1,25 @@
-# Copyright (C) 2021, Sorbonne Universite, LIP6
-# This file is part of the Muse project, under the GPL v3.0 license
+# Copyright (C) 2023, Sorbonne Universite, LIP6
+# This file is part of the VerifMSI project, under the GPL v3.0 license
 # See https://www.gnu.org/licenses/gpl-3.0.en.html for license information
 # SPDX-License-Identifier: GPL-3.0-only
 # Author(s): Etienne Pons, Quentin L. Meunier
 
-from __future__ import print_function
-
 from verif_msi import *
 
 
-nbExps = 0
+nbCheck = 0
 nbLeak = 0
 
 def checkExpLeakage(e):
-    global nbExps
+    global nbCheck
     global nbLeak
 
-    nbExps += 1
+    nbCheck += 1
 
     res, wordRes, niTime = checkTpsVal(e)
     if not res:
         nbLeak += 1
-        print('# Leakage in value for exp num %d (Total leaks : %d)' % (nbExps, nbLeak))
+        print('# Leakage in value for exp num %d (Total leaks : %d)' % (nbCheck, nbLeak))
 
 
 def secmult():
@@ -64,13 +62,13 @@ def secmult():
     c1 = simplify(c1)
     checkExpLeakage(c1)
 
-    global nbLeak, nbExps
-    return nbLeak, nbExps
+    global nbLeak, nbCheck
+    return nbLeak, nbCheck
 
 
 if __name__ == '__main__':
-    nbLeak, nbExps = secmult()
-    print('# Total Nb. of expressions analysed: %d' % nbExps)
+    nbLeak, nbCheck = secmult()
+    print('# Total Nb. of expressions analysed: %d' % nbCheck)
     print('# Total Nb. of potential leakages found: %d' % nbLeak)
 
 

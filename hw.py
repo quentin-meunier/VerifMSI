@@ -1,12 +1,8 @@
-#!/usr/bin/python
-
-# Copyright (C) 2021, Sorbonne Universite, LIP6
-# This file is part of the Muse project, under the GPL v3.0 license
+# Copyright (C) 2023, Sorbonne Universite, LIP6
+# This file is part of the VerifMSI project, under the GPL v3.0 license
 # See https://www.gnu.org/licenses/gpl-3.0.en.html for license information
 # SPDX-License-Identifier: GPL-3.0-only
 # Author(s): Quentin L. Meunier
-
-from __future__ import print_function
 
 from .node import *
 from .simplify import *
@@ -515,12 +511,10 @@ def checkSecurity(order, withGlitches, secProp, *outputs):
                 res = checkPINIVal(Concat(*t[0]), (len(t[1]) - len(outputIndexes), outputIndexes))
             else:
                 assert(False)
-            #if not res[0]:
-            #    print('# Leaking expression for component(s) (%s): %s' % (', '.join(map(lambda x: '%d' % x.num, t[1])), ', '.join(map(lambda x: '%s' % x, t[0]))))
-            #    res = checkTpsVal(Concat(*t[0]), True) # verbose
-            #    print('# Exiting')
-            #    sys.exit(0)
-            #    leakingHwe.append(t)
+
+            if not res[0]:
+                #print('# Leaking expression for component(s) (%s): %s' % (', '.join(map(lambda x: '%d' % x.num, t[1])), ', '.join(map(lambda x: '%s' % x, t[0]))))
+                leakingHwe.append(t)
 
         if len(leakingHwe) != 0:
             print('# Following Components\' outputs are not %s secure at order %d %s glitches:' % (secProp, order, withGlitches and 'with' or 'without'))
@@ -529,4 +523,5 @@ def checkSecurity(order, withGlitches, secProp, *outputs):
         else:
             print('# Circuit is secure in the %s security model at order %d %s glitches' % (secProp, order, withGlitches and 'with' or 'without'))
 
+    return len(leakingHwe), len(tuples)
 
