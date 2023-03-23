@@ -22,7 +22,7 @@ def checkExpLeakage(e):
         print('# Leakage in value for exp num %d (Total leaks : %d)' % (nbCheck, nbLeak))
 
 
-def secmult():
+def secmult_sm():
     a = symbol('a', 'S', 8)
     b = symbol('b', 'S', 8)
     
@@ -67,7 +67,7 @@ def secmult():
 
 
 if __name__ == '__main__':
-    nbLeak, nbCheck = secmult()
+    nbLeak, nbCheck = secmult_sm()
     print('# Total Nb. of expressions analysed: %d' % nbCheck)
     print('# Total Nb. of potential leakages found: %d' % nbLeak)
 
