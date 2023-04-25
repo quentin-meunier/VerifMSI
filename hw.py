@@ -16,9 +16,7 @@ class HWElement(object):
     nbNIcalls = 0
     remSingleInputProbesOpt = True
     remRedundantProbesOpt = True
-    remRandomProbesOpt = False # FIXME (2022/09/30): valid??? I think not
-    # TODO: recall why it works / how it is done in IronMask
-    bartheOpt = False
+    bartheOpt = True
 
     def __init__(self):
         self.num = HWElement.nodeNum
@@ -243,7 +241,7 @@ def checkSecurity(order, withGlitches, secProp, *outputs):
                     reducedGates.add(gate)
                 for g in toRemove:
                     reducedGates.remove(g)
-    elif secProp == 'ni' or secProp == 'rni' or secProp == 'sni':
+    elif secProp == 'ni' or secProp == 'rni' or secProp == 'sni' or secProp == 'pini':
         # Tuple reduction is not applicable to TPS
         # Checking if all input shares are part of the reachable gates
         reachableInputShares = set(filter(lambda x: isinstance(x, Gate) and x.op == 'I' and isinstance(x.symbExp, SymbNode) and x.symbExp.symbType == 'A', reachableGates))
@@ -304,6 +302,7 @@ def checkSecurity(order, withGlitches, secProp, *outputs):
                             for sh in h.symbExp.shareOcc[secret]:
                                 hShares.add(sh)
 
+                        # FIXME? For SNI and PINI, shouldn't we prevent the case in which the larger gate is an internal gate and the redundant gate an output gate?
                         if len(h.symbExp.otherMaskOcc) == 0 and set(g.symbExp.maskingMaskOcc.keys()) == set(h.symbExp.maskingMaskOcc.keys()) and gShares.issubset(hShares):
                             #print('# Shares of g: %s' % ', '.join(map(lambda x: '%s' % x, gShares)))
                             #print('# Shares of h: %s' % ', '.join(map(lambda x: '%s' % x, hShares)))
@@ -407,23 +406,23 @@ def checkSecurity(order, withGlitches, secProp, *outputs):
             tupleEnumBisRec(0, 0)
             return tuples
 
-
+        #allVerifiedTuples = set()
         def check(x, d, e, depth):
             def localPrint(param):
                 print('# ' + '   ' * depth, end = '')
                 print('%s' % param)
 
-            localPrint('check d = %d' % d)
-            localPrint('x = [' + ', '.join(map(lambda u: '%s' % expNames[u], x)) + ']')
+            #localPrint('check d = %d' % d)
+            #localPrint('x = [' + ', '.join(map(lambda u: '%s' % expNames[u], x)) + ']')
             #localPrint('  = [' + ', '.join(map(lambda u: '%s' % u, x)) + ']')
-            localPrint('e = [' + ', '.join(map(lambda u: '%s' % expNames[u], e)) + ']')
+            #localPrint('e = [' + ', '.join(map(lambda u: '%s' % expNames[u], e)) + ']')
             #localPrint('  = [' + ', '.join(map(lambda u: '%s' % u, e)) + ']')
             assert(len(x) + d == order)
             if d <= len(e):
                 y = choose(e, d)
-                localPrint('y = [' + ', '.join(map(lambda u: '%s' % expNames[u], y)) + ']')
+                #localPrint('y = [' + ', '.join(map(lambda u: '%s' % expNames[u], y)) + ']')
                 #localPrint('  = [' + ', '.join(map(lambda u: '%s' % u, y)) + ']')
-                localPrint('checkNIVal(' + ', '.join(map(lambda u: '%s' % expNames[u], tuple(x | y))) + ')')
+                #localPrint('checkNIVal(' + ', '.join(map(lambda u: '%s' % expNames[u], tuple(x | y))) + ')')
                 #localPrint('checkNIVal(' + ', '.join(map(lambda u: '%s' % u, tuple(x | y))) + ')')
                 # orig
                 #h = checkNIVal(Concat(*tuple(x | y)), order)
@@ -433,37 +432,39 @@ def checkSecurity(order, withGlitches, secProp, *outputs):
                 HWElement.nbNIcalls += 1
                 # fin alt
                 if not h[0]:
-                    localPrint('return False')
+                    #localPrint('return False')
                     return False
                 # orig
                 #yc = extend(y, e - y)
                 # alt
-                assert(e - y == e - z)
+                #assert(e - y == e - z)
                 yc = extend(z, e - y)
                 # fin alt
-                localPrint('yc = [' + ', '.join(map(lambda u: '%s' % expNames[u], yc)) + ']')
+                #verifiedTuples = tupleEnumBis(yc, order)
+                #for vt in verifiedTuples:
+                #    allVerifiedTuples.add(vt)
+                #localPrint('yc = [' + ', '.join(map(lambda u: '%s' % expNames[u], yc)) + ']')
                 #localPrint('   = [' + ', '.join(map(lambda u: '%s' % u, yc)) + ']')
-                if y != yc:
-                    localPrint('yc different from y')
-                else:
-                    localPrint('yc same as y')
-                # orig
-                #res = check(x, d, e - yc, depth + 1)
+                #if y != yc:
+                #    localPrint('yc different from y')
+                #else:
+                #    localPrint('yc same as y')
+                eMinusyc = e - yc
                 # alt
-                if not e.issubset(yc):
-                    res = check(x, d, e - yc, depth + 1)
-                res = check(set(), order, e - yc, depth + 1)
+                ycMinusx = yc - x
                 # fin alt
+                res = check(x, d, eMinusyc, depth + 1)
                 if not res:
+                    #localPrint('not res, return False')
                     return False
                 for i in range(1, d):
-                    tuples = tupleEnumBis(yc, i)
+                    # orig
+                    #tuples = tupleEnumBis(yc, i)
+                    # alt
+                    tuples = tupleEnumBis(ycMinusx, i)
+                    # fin alt
                     for t in tuples:
-                        # orig
-                        #res = check(x | t, d - i, e - yc, depth + 1)
-                        # alt
-                        res = check(t, order - i, e - yc, depth + 1)
-                        # fin alt
+                        res = check(x | t, d - i, eMinusyc, depth + 1)
                         if not res:
                             return False
                 return True
@@ -474,8 +475,16 @@ def checkSecurity(order, withGlitches, secProp, *outputs):
         print('\n'.join(map(lambda x: '#    Exp: %s' % x, reducedGatesExp)))
 
         res = check(set(), order, reducedGatesExp, 0)
+        #allTuples = tupleEnumBis(reducedGatesExp, order)
+        #for t in allTuples:
+        #    if t not in allVerifiedTuples:
+        #        print('# Missing tuple [' + ', '.join(map(lambda u: '%s' % expNames[u], t)) + ']\n') 
         print('# Res for Barthe Algo: %s' % str(res))
         print('# Nb. NI calls: %d' % HWElement.nbNIcalls)
+        if res:
+            return 0, HWElement.nbNIcalls
+        else:
+            return 1, HWElement.nbNIcalls
     else:
 
         print('# Starting tuple enumeration')

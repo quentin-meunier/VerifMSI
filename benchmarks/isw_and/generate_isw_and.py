@@ -23,7 +23,7 @@ def usage():
     print('-f,  --outfile <file>       : Set the name of the generated output file to <file> (default: %s)' % outfile)
     print('-n,  --nb-shares <n>        : Set the number of shares in the scheme to <n> (default: %s)' % nbShares)
     print('-o,  --order <n>            : set the order of the verification to (default: %s)' % order)
-    print('-p,  --prop                 : Set security property to verify: either \'ni\' (Non-Interference), \'sni\' (Strong Non-Interference) \'rni\' (Relaxed Non-Interference) or \'tps\' (Treshold Probing Security). NI and SNI use a share description for the inputs, while TPS uses a secrets + masks description (default: %s)' % prop)
+    print('-p,  --prop                 : Set security property to verify: either \'ni\' (Non-Interference), \'sni\' (Strong Non-Interference) \'rni\' (Relaxed Non-Interference), \'pini\' (Probing-Isolating Non-Interference) or \'tps\' (Treshold Probing Security). NI, SNI, RNI and PINI use a share description for the inputs, while TPS uses a secrets + masks description (default: %s)' % prop)
     print('-g,  --with-glitches        : Consider glitch propagation throughout gates (defaut: %s)' % (withGlitches and 'Yes' or 'No'))
     print('-ng, --without-glitches     : Do not consider glitch propagation throughout gates (defaut: %s)' % (withGlitches and 'No' or 'Yes'))
     print('-r,  --with-rand            : Use an additional random for computing expressions of the form a_i & b_j,')
@@ -79,19 +79,18 @@ def generate_isw_and(*argv):
         print('*** Error: the order of verification (%d) must be less than the number of shares (%d)' % (order, nbShares))
         sys.exit(1)
     
-    if prop != 'ni' and prop != 'sni' and prop != 'tps' and prop != 'rni':
+    if prop != 'ni' and prop != 'sni' and prop != 'tps' and prop != 'rni' and prop != 'pini':
         print('*** Error: Unknown security property: %s' % prop)
-        print('    Valid values are: \'ni\' (Non-Interference), \'sni\' (Strong Non-Interference), \'rni\' (Relaxed Non-Interference) and \'tps\' (Treshold Probing Security)')
+        print('    Valid values are: \'ni\' (Non-Interference), \'sni\' (Strong Non-Interference), \'rni\' (Relaxed Non-Interference), \'pini\' (Probing-Isolating Non-Interference) and \'tps\' (Treshold Probing Security)')
         sys.exit(1)
-    
-    
+
     nextRandNum = 0
     def getNewRandNum():
         global nextRandNum
         v = nextRandNum
         nextRandNum += 1
         return v
-    
+
 
     content = '''# Copyright (C) 2023, Sorbonne Universite, LIP6
 # This file is part of the VerifMSI project, under the GPL v3.0 license
@@ -120,7 +119,7 @@ import sys
     print('   This file was generated using the script generate_isw_and.py')
     print('Options:')
     print('-o,  --order <n>            : Set the order of the verification to (default: %%d)' %% order)
-    print('-p,  --prop                 : Set security property to verify: either \\\'ni\\\' (Non-Interference), \\\'sni\\\' (Strong Non-Interference) \\\'rni\\\' (Relaxed Non-Interference) or \\\'tps\\\' (Treshold Probing Security). NI and SNI use a share description for the inputs, while TPS uses a secrets + masks description (default: %%s)' %% prop)
+    print('-p,  --prop                 : Set security property to verify: either \\\'ni\\\' (Non-Interference), \\\'sni\\\' (Strong Non-Interference) \\\'rni\\\' (Relaxed Non-Interference), \\\'pini\\\' (Probing-Isolating Non-Interference) or \\\'tps\\\' (Treshold Probing Security). NI, SNI, RNI and PINI use a share description for the inputs, while TPS uses a secrets + masks description (default: %%s)' %% prop)
     print('-g,  --with-glitches        : Consider glitch propagation throughout gates (defaut: %%s)' %% (withGlitches and 'Yes' or 'No'))
     print('-ng, --without-glitches     : Do not consider glitch propagation throughout gates (defaut: %%s)' %% (withGlitches and 'No' or 'Yes'))
     print('-d, --dump-circuit          : Dump the circuit in dot format in a file named \\\'%%s\\\' (default: %%r)' %% (circuitFilename, dumpCircuit))
@@ -168,9 +167,9 @@ import sys
         print('*** Error: the order of verification (%%d) must be less than the number of shares (%d)' %% (order))
         sys.exit(1)
     
-    if prop != 'ni' and prop != 'sni' and prop != 'tps' and prop != 'rni':
+    if prop != 'ni' and prop != 'sni' and prop != 'tps' and prop != 'rni' and prop != 'pini':
         print('*** Error: Unknown security property: %%s' %% prop)
-        print('    Valid values are: \\\'ni\\\' (Non-Interference), \\\'sni\\\' (Strong Non-Interference), \\\'rni\\\' (Relaxed Non-Interference) and \\\'tps\\\' (Treshold Probing Security)')
+        print('    Valid values are: \\\'ni\\\' (Non-Interference), \\\'sni\\\' (Strong Non-Interference), \\\'rni\\\' (Relaxed Non-Interference), \\\'pini\\\' (Probing-Isolating Non-Interference) and \\\'tps\\\' (Treshold Probing Security)')
         sys.exit(1)
     
 

@@ -80,8 +80,8 @@ def checkNIVal(e, maxShareOcc):
 def checkRNIVal(e, maxShareOcc):
     return checkPropVal(e, 'rni', maxShareOcc)
 
-def checkPINIVal(e, maxShareOcc, outputIndexes):
-    return checkPropVal(e, 'rni', maxShareOcc)
+def checkPINIVal(e, maxShareOcc):
+    return checkPropVal(e, 'pini', maxShareOcc)
 
 
 

@@ -21,8 +21,8 @@ def usage():
     print('Usage: %s [options]' % os.path.basename(__file__))
     print('   This script contains a VerifMSI description a circuit implementing the \'SNI Mult\' algorithm [?] with 7 shares.')
     print('Options:')
-    print('-o,  --order <n>            : Set the order of the verification to (default: %s)' % order)
-    print('-p,  --prop                 : Set security property to verify: either \'ni\' (Non-Interference), \'sni\' (Strong Non-Interference) \'rni\' (Relaxed Non-Interference) or \'tps\' (Treshold Probing Security). NI and SNI use a share description for the inputs, while TPS uses a secrets + masks description (default: %s)' % prop)
+    print('-o,  --order <n>            : Set the order of the verification to (default: %d)' % order)
+    print('-p,  --prop                 : Set security property to verify: either \'ni\' (Non-Interference), \'sni\' (Strong Non-Interference) \'rni\' (Relaxed Non-Interference), \'pini\' (Probing-Isolating Non-Interference) or \'tps\' (Treshold Probing Security). NI, SNI, RNI and PINI use a share description for the inputs, while TPS uses a secrets + masks description (default: %s)' % prop)
     print('-g,  --with-glitches        : Consider glitch propagation throughout gates (defaut: %s)' % (withGlitches and 'Yes' or 'No'))
     print('-ng, --without-glitches     : Do not consider glitch propagation throughout gates (defaut: %s)' % (withGlitches and 'No' or 'Yes'))
     print('-d, --dump-circuit          : Dump the circuit in dot format in a file named \'%s\' (default: %r)' % (circuitFilename, dumpCircuit))
@@ -67,23 +67,22 @@ def sni_mult_7_shares(*argv):
         print('*** Error: the order of verification (%d) must be less than the number of shares (7)' % (order))
         sys.exit(1)
     
-    if prop != 'ni' and prop != 'sni' and prop != 'tps' and prop != 'rni':
+    if prop != 'ni' and prop != 'sni' and prop != 'tps' and prop != 'rni' and prop != 'pini':
         print('*** Error: Unknown security property: %s' % prop)
-        print('    Valid values are: \'ni\' (Non-Interference), \'sni\' (Strong Non-Interference), \'rni\' (Relaxed Non-Interference) and \'tps\' (Treshold Probing Security)')
+        print('    Valid values are: \'ni\' (Non-Interference), \'sni\' (Strong Non-Interference), \'rni\' (Relaxed Non-Interference), \'pini\' (Probing-Isolating Non-Interference) and \'tps\' (Treshold Probing Security)')
         sys.exit(1)
- 
 
 
     a = symbol('a', 'S', 1)
     b = symbol('b', 'S', 1)
-    
+
     if prop == 'tps':
         a0, a1, a2, a3, a4, a5, a6 = getPseudoShares(a, 7)
         b0, b1, b2, b3, b4, b5, b6 = getPseudoShares(b, 7)
     else:
         a0, a1, a2, a3, a4, a5, a6 = getRealShares(a, 7)
         b0, b1, b2, b3, b4, b5, b6 = getRealShares(b, 7)
-    
+
     a0 = inputGate(a0)
     a1 = inputGate(a1)
     a2 = inputGate(a2)
@@ -98,7 +97,7 @@ def sni_mult_7_shares(*argv):
     b4 = inputGate(b4)
     b5 = inputGate(b5)
     b6 = inputGate(b6)
-    
+
     r0 = symbol('r0', 'M', 1)
     r1 = symbol('r1', 'M', 1)
     r2 = symbol('r2', 'M', 1)
@@ -192,36 +191,15 @@ def sni_mult_7_shares(*argv):
     a6b4 = andGate(a6, b4)
     a6b5 = andGate(a6, b5)
     a6b6 = andGate(a6, b6)
-    
+
     alpha_0_0 = a0b0
-    alpha_0_1 = xorGate(a0b1, a1b0)
-    alpha_0_2 = xorGate(a0b2, a2b0)
-    alpha_0_3 = xorGate(a0b3, a3b0)
-    alpha_0_4 = xorGate(a0b4, a4b0)
-    alpha_0_5 = xorGate(a0b5, a5b0)
-    alpha_0_6 = xorGate(a0b6, a6b0)
     alpha_1_1 = a1b1
-    alpha_1_2 = xorGate(a1b2, a2b1)
-    alpha_1_3 = xorGate(a1b3, a3b1)
-    alpha_1_4 = xorGate(a1b4, a4b1)
-    alpha_1_5 = xorGate(a1b5, a5b1)
-    alpha_1_6 = xorGate(a1b6, a6b1)
     alpha_2_2 = a2b2
-    alpha_2_3 = xorGate(a2b3, a3b2)
-    alpha_2_4 = xorGate(a2b4, a4b2)
-    alpha_2_5 = xorGate(a2b5, a5b2)
-    alpha_2_6 = xorGate(a2b6, a6b2)
     alpha_3_3 = a3b3
-    alpha_3_4 = xorGate(a3b4, a4b3)
-    alpha_3_5 = xorGate(a3b5, a5b3)
-    alpha_3_6 = xorGate(a3b6, a6b3)
     alpha_4_4 = a4b4
-    alpha_4_5 = xorGate(a4b5, a5b4)
-    alpha_4_6 = xorGate(a4b6, a6b4)
     alpha_5_5 = a5b5
-    alpha_5_6 = xorGate(a5b6, a6b5)
     alpha_6_6 = a6b6
-    
+
     c0 = alpha_0_0
     c1 = alpha_1_1
     c2 = alpha_2_2
@@ -229,50 +207,71 @@ def sni_mult_7_shares(*argv):
     c4 = alpha_4_4
     c5 = alpha_5_5
     c6 = alpha_6_6
-    
+
     c0 = xorGate(c0, r0)
-    c0 = xorGate(c0, alpha_0_1)
+    c0 = xorGate(c0, a0b1) # alpha_0_1
+    c0 = xorGate(c0, a1b0)
     c1 = xorGate(c1, r1)
-    c1 = xorGate(c1, alpha_1_2)
+    c1 = xorGate(c1, a1b2) # alpha_1_2
+    c1 = xorGate(c1, a2b1)
     c2 = xorGate(c2, r2)
-    c2 = xorGate(c2, alpha_2_3)
+    c2 = xorGate(c2, a2b3) # alpha_2_3
+    c2 = xorGate(c2, a3b2)
     c3 = xorGate(c3, r3)
-    c3 = xorGate(c3, alpha_3_4)
+    c3 = xorGate(c3, a3b4) # alpha_3_4
+    c3 = xorGate(c3, a4b3)
     c4 = xorGate(c4, r4)
-    c4 = xorGate(c4, alpha_4_5)
+    c4 = xorGate(c4, a4b5) # alpha_4_5
+    c4 = xorGate(c4, a5b4)
     c5 = xorGate(c5, r5)
-    c5 = xorGate(c5, alpha_5_6)
+    c5 = xorGate(c5, a5b6) # alpha_5_6
+    c5 = xorGate(c5, a6b5)
     c6 = xorGate(c6, r6)
-    c6 = xorGate(c6, alpha_0_6)
+    c6 = xorGate(c6, a0b6) # alpha_0_6
+    c6 = xorGate(c6, a6b0)
     c0 = xorGate(c0, r1)
-    c0 = xorGate(c0, alpha_0_2)
+    c0 = xorGate(c0, a0b2) # alpha_0_2
+    c0 = xorGate(c0, a2b0)
     c1 = xorGate(c1, r2)
-    c1 = xorGate(c1, alpha_1_3)
+    c1 = xorGate(c1, a1b3) # alpha_1_3
+    c1 = xorGate(c1, a3b1)
     c2 = xorGate(c2, r3)
-    c2 = xorGate(c2, alpha_2_4)
+    c2 = xorGate(c2, a2b4) # alpha_2_4
+    c2 = xorGate(c2, a4b2)
     c3 = xorGate(c3, r4)
-    c3 = xorGate(c3, alpha_3_5)
+    c3 = xorGate(c3, a3b5) # alpha_3_5
+    c3 = xorGate(c3, a5b3)
     c4 = xorGate(c4, r5)
-    c4 = xorGate(c4, alpha_4_6)
+    c4 = xorGate(c4, a4b6) # alpha_4_6
+    c4 = xorGate(c4, a6b4)
     c5 = xorGate(c5, r6)
-    c5 = xorGate(c5, alpha_0_5)
+    c5 = xorGate(c5, a0b5) # alpha_0_5
+    c5 = xorGate(c5, a5b0)
     c6 = xorGate(c6, r0)
-    c6 = xorGate(c6, alpha_1_6)
+    c6 = xorGate(c6, a1b6) # alpha_1_6
+    c6 = xorGate(c6, a6b1)
     c0 = xorGate(c0, r7)
-    c0 = xorGate(c0, alpha_0_3)
+    c0 = xorGate(c0, a0b3) # alpha_0_3
+    c0 = xorGate(c0, a3b0)
     c1 = xorGate(c1, r8)
-    c1 = xorGate(c1, alpha_1_4)
+    c1 = xorGate(c1, a1b4) # alpha_1_4
+    c1 = xorGate(c1, a4b1)
     c2 = xorGate(c2, r9)
-    c2 = xorGate(c2, alpha_2_5)
+    c2 = xorGate(c2, a2b5) # alpha_2_5
+    c2 = xorGate(c2, a5b2)
     c3 = xorGate(c3, r10)
-    c3 = xorGate(c3, alpha_3_6)
+    c3 = xorGate(c3, a3b6) # alpha_3_6
+    c3 = xorGate(c3, a6b3)
     c4 = xorGate(c4, r11)
-    c4 = xorGate(c4, alpha_0_4)
+    c4 = xorGate(c4, a0b4) # alpha_0_4
+    c4 = xorGate(c4, a4b0)
     c5 = xorGate(c5, r12)
-    c5 = xorGate(c5, alpha_1_5)
+    c5 = xorGate(c5, a1b5) # alpha_1_5
+    c5 = xorGate(c5, a5b1)
     c6 = xorGate(c6, r13)
-    c6 = xorGate(c6, alpha_2_6)
-    
+    c6 = xorGate(c6, a2b6) # alpha_2_6
+    c6 = xorGate(c6, a6b2)
+
     c0 = xorGate(c0, r8)
     c0 = xorGate(c0, r20)
     c0 = xorGate(c0, r26)
@@ -294,7 +293,7 @@ def sni_mult_7_shares(*argv):
     c6 = xorGate(c6, r7)
     c6 = xorGate(c6, r26)
     c6 = xorGate(c6, r25)
-    
+ 
     if checkFunctionality:
         res, v0, v1 = compareExpsWithRandev(c0.symbExp ^ c1.symbExp ^ c2.symbExp ^ c3.symbExp ^ c4.symbExp ^ c5.symbExp ^ c6.symbExp, a & b, 100000)
         if res == None:
@@ -302,10 +301,10 @@ def sni_mult_7_shares(*argv):
         else:
             print('# functionality (random evaluation): [KO]')
             print(res)
-    
+
     if dumpCirc:
         dumpCircuit(circuitFilename, c0, c1, c2, c3, c4, c5, c6)
-    
+
     nbLeak, nbCheck = checkSecurity(order, withGlitches, prop, c0, c1, c2, c3, c4, c5, c6)
     return nbLeak, nbCheck
 

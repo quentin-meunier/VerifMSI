@@ -68,9 +68,17 @@ def pini(nodeIn, maxShareOcc, verbose = False):
     return checkProperty(nodeIn, 'pini', maxShareOcc, verbose)
 
 
-def checkProperty(nodeIn, secProp, maxShareOcc, verbose):
+def checkProperty(nodeIn, secProp, params, verbose):
     if verbose:
         print('# Call func tps on exp %s' % nodeIn)
+
+    if secProp == 'ni':
+        maxShareOcc = params
+    elif secProp == 'rni':
+        diff = params # Difference between the order of verification and the n-uplet size
+    elif secProp == 'pini':
+        maxShareOcc = params[0]
+        outputIndexes = params[1]
 
     node = simplify(nodeIn)
 
@@ -102,22 +110,28 @@ def checkProperty(nodeIn, secProp, maxShareOcc, verbose):
                 for anyOcc in node.shareOcc[s]:
                     nbShares = anyOcc.nbShares
                     break
-                if len(node.shareOcc[s]) >= nbShares - maxShareOcc:
+                if len(node.shareOcc[s]) >= nbShares - diff:
                     isRNI = False
                     break
             if isRNI:
                 return True
         elif secProp == 'pini':
-            maxShareOccReal = maxShareOcc[0]
-            outputIndexes = maxShareOcc[1]
-            isPINI = False
+            isPINI = True
+            #print('# maxShareOcc: %d' % maxShareOcc)
+            #print('# outputIndexes: %s' % ' '.join(map(lambda x: '%d' % x, outputIndexes)))
             for s in node.shareOcc:
+                #print('# secret %s' % s.symb)
                 nbOcc = 0
                 for sh in node.shareOcc[s]:
-                    num = int(sh.name[-2]) # FIXME: fails if ten or more shares... add num in node??
+                    num = int(sh.symb[-2]) # FIXME: fails if ten or more shares... add num in node??
+                    #print('# share %s' % sh.symb)
+                    #print('# share num: %d' % num)
                     if num not in outputIndexes:
                         nbOcc += 1
-                if nbOcc > maxShareOccReal:
+                        #print('# num not in outputIndexes')
+                #print('# nbOcc: %d' % nbOcc)
+                if nbOcc > maxShareOcc:
+                    #print('# isPini = False')
                     isPINI = False
                     break
             if isPINI:
@@ -133,41 +147,73 @@ def checkProperty(nodeIn, secProp, maxShareOcc, verbose):
         # - For this CTR Base, choose the CTR with the max height for the same count
         maskingMaskOcc = node.maskingMaskOcc
         otherMaskOcc = node.otherMaskOcc
-        minOcc = 1000000 # FIXME...
+        minOtherOcc = 1000000 # FIXME...
+        minMaskingOcc = 1000000
+        minRootMask = False
         selMask = None
         for m in maskingMaskOcc:
-            # QM FIXME
-            # Allow to take a masks several times, as long as its number of occs (masking? total? sum? masking AND other?) decreases
-            # (save in m the number of occs when chosen)
-            if m in masksTaken:
+            nbMaskingOcc = len(maskingMaskOcc[m])
+
+            try:
+                nbOtherOcc = len(otherMaskOcc[m])
+            except:
+                nbOtherOcc = 0
+
+            # QM FIXME: try to change the condition nbMaskingOcc == 1 with the fact that the number of maskingOcc has decreased since the last time the mask was taken?
+            if m in masksTaken and not (nbMaskingOcc == 1 and nbOtherOcc == 0):
                 continue
+            
+            rootMask = (node.op == 'C' and m in node.children)
 
-            if m in maskingMaskOcc:
-                nbMaskingOp = len(maskingMaskOcc[m])
-            else:
-                assert(False)
-                continue
-
-            if m in otherMaskOcc:
-                nbOtherOp = len(otherMaskOcc[m])
-            else:
-                nbOtherOp = 0
-
-            # QM FIXME: try this heuristic
+            # Heuristic:
             # 1. First, minimize the number of otherOcc
             # 2. For the masks with a min number of otherOcc, minimize the number of maskingOcc
-            nbOcc = nbMaskingOp + nbOtherOp
-            if nbOcc < minOcc:
-                minOcc = nbOcc
+            # (Old heuristic: minimize total number of occurrences)
+            if (not rootMask and minRootMask) or (rootMask == minRootMask and (nbOtherOcc < minOtherOcc or (nbOtherOcc == minOtherOcc and nbMaskingOcc < minMaskingOcc))):
                 selMask = m
+                minRootMask = rootMask
+                minOtherOcc = nbOtherOcc
+                minMaskingOcc = nbMaskingOcc
+
+        # Enable the selection of masks at the root of the Concat
+        #if selMask == None:
+        #    for m in maskingMaskOcc:
+        #        nbMaskingOcc = len(maskingMaskOcc[m])
+    
+        #        try:
+        #            nbOtherOcc = len(otherMaskOcc[m])
+        #        except:
+        #            nbOtherOcc = 0
+    
+        #        # QM FIXME: try to change the condition nbMaskingOcc == 1 with the fact that the number of maskingOcc has decreased since the last time the mask was taken?
+        #        if m in masksTaken and not (nbMaskingOcc == 1 and nbOtherOcc == 0):
+        #            continue
+        #        
+        #        # Heuristic:
+        #        # 1. First, minimize the number of otherOcc
+        #        # 2. For the masks with a min number of otherOcc, minimize the number of maskingOcc
+        #        # (Old heuristic: minimize total number of occurrences)
+        #        if nbOtherOcc < minOtherOcc or (nbOtherOcc == minOtherOcc and nbMaskingOcc < minMaskingOcc):
+        #            selMask = m
+        #            minOtherOcc = nbOtherOcc
+        #            minMaskingOcc = nbMaskingOcc
+
 
         if selMask == None:
+            #removeFromMasksTaken = set()
+            #for m in masksTaken:
+            #    if len(maskingMaskOcc[m]) == 1 and (m not in otherMaskOcc or otherMaskOcc[m] == 0):
+            #        removeFromMasksTaken.add(m)
+            #if len(removeFromMasksTaken) != 0:
+            #    for m in removeFromMasksTaken:
+            #        masksTaken.remove(m)
+            #    continue
             if verbose:
                 print('# No mask can be taken')
             return False
 
         if verbose:
-            print('# Choosing mask %s (number of parent nodes: %d)' % (selMask, minOcc))
+            print('# Choosing mask %s (number of parent nodes: %d)' % (selMask, (minMaskingOcc + minOtherOcc)))
 
         maxCount = 0
         selCtrBase = None
