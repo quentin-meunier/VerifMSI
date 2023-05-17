@@ -88,10 +88,6 @@ class Node(object):
 
 
     def printVarOcc(self):
-        #print('Masks: {', end = '')
-        #for m in self.maskVarOcc.keys():
-        #    print('%s: %d; ' % (m.symb, self.maskVarOcc[m]), end = '')
-        #print('}')
         print('Secrets: {', end = '')
         for m in self.secretVarOcc.keys():
             print('%s: %d; ' % (m.symb, self.secretVarOcc[m]), end = '')
@@ -117,21 +113,21 @@ class Node(object):
         print('# Currently masking:')
         for m in self.currentlyMasking:
             print('#    Mask %s' % m)
-            #print('#        CTR: %s' % self.currentlyMasking[m])
+            print('#        CTR: %s' % self.currentlyMasking[m])
         print('# Masking mask occurrences:')
         for m in self.maskingMaskOcc:
             print('#    Mask %s' % m)
             for ctrBase in self.maskingMaskOcc[m]:
-                #print('#        ctrBase %s' % ctrBase)
+                print('#        ctrBase %s' % ctrBase)
                 for ctr in self.maskingMaskOcc[m][ctrBase]:
-                    #print('#            ctr %s' % ctr)
+                    print('#            ctr %s' % ctr)
                     print('#                count:  %d' % self.maskingMaskOcc[m][ctrBase][ctr][0])
                     print('#                height: %d' % self.maskingMaskOcc[m][ctrBase][ctr][1])
         print('# Other mask occurrences:')
         for m in self.otherMaskOcc:
             print('#    Mask %s' % m)
             for p in self.otherMaskOcc[m]:
-                #print('#        Parent: %s' % p)
+                print('#        Parent: %s' % p)
                 print('#            count: %d' % self.otherMaskOcc[m][p])
 
 
@@ -187,7 +183,6 @@ class Node(object):
 
     @staticmethod
     def dumpNodes(filename, nodes):
-        f = open(filename, 'w')
         content = 'digraph g {\n'
         for n in nodes:
             if isinstance(n, SymbNode):
@@ -214,6 +209,7 @@ class Node(object):
                 content += '   edge[tailclip=true];\n'
                 content += '   N%d -> N%d\n' % (n.num, a.num)
         content += '}'
+        f = open(filename, 'w')
         f.write(content)
         f.close()
 
@@ -678,7 +674,7 @@ def Symb(symb, symbType, width, nbShares = None, origSecret = None, pseudoShareE
 
 
 def SymbInternal(symb, symbType, width, nbShares = None, origSecret = None, pseudoShareEq = None):
-    # FIXME: check width ?
+    # FIXME: check width?
     if symb in Node.symb2node:
         return Node.symb2node[symb]
     else:

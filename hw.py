@@ -16,7 +16,7 @@ class HWElement(object):
     nbNIcalls = 0
     remSingleInputProbesOpt = True
     remRedundantProbesOpt = True
-    bartheOpt = True
+    bartheOpt = False
 
     def __init__(self):
         self.num = HWElement.nodeNum
@@ -153,36 +153,6 @@ def dumpCircuit(filename, *outputs):
 def checkSecurity(order, withGlitches, secProp, *outputs):
     print('# Checking Security at order %d (%s, %s property)' % (order, withGlitches and 'with glitches' or 'no glitches', secProp))
 
-    #def tupleEnum(gateList, order, includePartialTuples):
-
-    #    def tupleEnumRec(tuples, s, l, tupleLen, i, includePartialTuples):
-    #        def getLeakExps(gates):
-    #            t = set()
-    #            for gate in gates:
-    #                if withGlitches:
-    #                    for leakExp in gate.leakageOut:
-    #                        t.add(leakExp)
-    #                else:
-    #                    t.add(gate.symbExp)
-    #            return t
-    #
-    #        if i == len(l):
-    #            tuples.add((tuple(getLeakExps(s)), tuple(s)))
-    #        else:
-    #            if len(s) < tupleLen:
-    #                if includePartialTuples and len(s) > 0:
-    #                    tuples.add((tuple(getLeakExps(s)), tuple(s)))
-    #                s.add(l[i])
-    #                tupleEnumRec(tuples, s, l, tupleLen, i + 1, includePartialTuples)
-    #                s.remove(l[i])
-    #            if tupleLen - len(s) < len(l) - i:
-    #                tupleEnumRec(tuples, s, l, tupleLen, i + 1, includePartialTuples)
-
-    #    tuples = set()
-    #    s = set()
-    #    tupleEnumRec(tuples, s, gateList, order, 0, includePartialTuples)
-    #    return tuples
-
     def tupleEnum(gateList, order, includePartialTuples):
         tuples = set()
         tupleLen = order
@@ -214,7 +184,6 @@ def checkSecurity(order, withGlitches, secProp, *outputs):
         return tuples
 
 
-    # FIXME: add transitions?
     reachableGates = set()
     for gate in outputs:
         getReachableGates(gate, reachableGates)
@@ -259,7 +228,7 @@ def checkSecurity(order, withGlitches, secProp, *outputs):
 
 
         # Remove the gate / probe if it contains at most one share per input and no random
-        # or is a random probe, or has exactly the same masking randoms and the same or a subset of the input shares of another gate
+        # or has exactly the same masking randoms and the same or a subset of the input shares of another gate
         doRemSingleInputProbesOpt = HWElement.remSingleInputProbesOpt and allInputShares
         if doRemSingleInputProbesOpt:
             print('# Removing Probes with at most 1 share / input and no random')
@@ -320,20 +289,6 @@ def checkSecurity(order, withGlitches, secProp, *outputs):
                     reducedGates.remove(g)
                     withdrawnGates.add(g)
 
-
-        #doRemRandomProbesOpt = HWElement.remRandomProbesOpt
-        #if doRemRandomProbesOpt:
-        #    print('# Removing Random Probes')
-
-        #    for g in sorted(reducedGates, key = lambda x: x.num):
-        #        verifyGate = True
-        #        if isinstance(g.symbExp, SymbNode) and g.symbExp.symbType == 'M':
-        #            verifyGate = False
-
-        #        if not verifyGate:
-        #            print('# Removing gate %d: %s' % (g.num, g.symbExp))
-        #            reducedGates.remove(g)
-        #            withdrawnGates.add(g)
     else:
         assert(secProp == 'tps')
         reducedGates = reachableGates
@@ -344,11 +299,7 @@ def checkSecurity(order, withGlitches, secProp, *outputs):
     print('# Reduced gates (%d):   ' % (len(reducedGates)) + ' '.join(map(lambda x: '%s' % x.num, gates)))
     print('\n'.join(map(lambda x: '# Gate %d: %s' % (x.num, x.symbExp), sorted(gates, key = lambda x: x.num))))
 
-    if HWElement.bartheOpt:
-        # FIXME: what if using pseudo shares?
-        #        change calls checkNIVal to checkTpsVal? But what about the order parameter?
-        #        Yet in the original algo, this optimisation was done on TPS?
-        #        I am almost sure that we can replace the call with a call to Tps (2022/09/30)
+    if (secProp == 'ni' or secProp == 'tps') and HWElement.bartheOpt:
 
         expNames = {}
         expNum = 0
@@ -362,6 +313,12 @@ def checkSecurity(order, withGlitches, secProp, *outputs):
                 expNames[g.symbExp] = 'e%d' % expNum
                 expNum += 1
  
+        def checkProp(e, order):
+            if secProp == 'tps':
+                return checkTpsVal(e)
+            else:
+                return checkNIVal(e, order)
+
 
         def choose(e, nb):
             s = set()
@@ -378,7 +335,7 @@ def checkSecurity(order, withGlitches, secProp, *outputs):
                 return y
             
             elem = choose(e, 1)
-            res = checkNIVal(Concat(*tuple(y | elem)), order)
+            res = checkProp(Concat(*tuple(y | elem)), order)
             HWElement.nbNIcalls += 1
             elemSet = set(elem)
             if res[0]:
@@ -406,7 +363,6 @@ def checkSecurity(order, withGlitches, secProp, *outputs):
             tupleEnumBisRec(0, 0)
             return tuples
 
-        #allVerifiedTuples = set()
         def check(x, d, e, depth):
             def localPrint(param):
                 print('# ' + '   ' * depth, end = '')
@@ -424,45 +380,23 @@ def checkSecurity(order, withGlitches, secProp, *outputs):
                 #localPrint('  = [' + ', '.join(map(lambda u: '%s' % u, y)) + ']')
                 #localPrint('checkNIVal(' + ', '.join(map(lambda u: '%s' % expNames[u], tuple(x | y))) + ')')
                 #localPrint('checkNIVal(' + ', '.join(map(lambda u: '%s' % u, tuple(x | y))) + ')')
-                # orig
-                #h = checkNIVal(Concat(*tuple(x | y)), order)
-                # alt
                 z = x | y
-                h = checkNIVal(Concat(*tuple(z)), order)
+                h = checkProp(Concat(*tuple(z)), order)
                 HWElement.nbNIcalls += 1
-                # fin alt
                 if not h[0]:
                     #localPrint('return False')
                     return False
-                # orig
-                #yc = extend(y, e - y)
-                # alt
-                #assert(e - y == e - z)
                 yc = extend(z, e - y)
-                # fin alt
-                #verifiedTuples = tupleEnumBis(yc, order)
-                #for vt in verifiedTuples:
-                #    allVerifiedTuples.add(vt)
                 #localPrint('yc = [' + ', '.join(map(lambda u: '%s' % expNames[u], yc)) + ']')
                 #localPrint('   = [' + ', '.join(map(lambda u: '%s' % u, yc)) + ']')
-                #if y != yc:
-                #    localPrint('yc different from y')
-                #else:
-                #    localPrint('yc same as y')
                 eMinusyc = e - yc
-                # alt
                 ycMinusx = yc - x
-                # fin alt
                 res = check(x, d, eMinusyc, depth + 1)
                 if not res:
                     #localPrint('not res, return False')
                     return False
                 for i in range(1, d):
-                    # orig
-                    #tuples = tupleEnumBis(yc, i)
-                    # alt
                     tuples = tupleEnumBis(ycMinusx, i)
-                    # fin alt
                     for t in tuples:
                         res = check(x | t, d - i, eMinusyc, depth + 1)
                         if not res:
@@ -475,10 +409,6 @@ def checkSecurity(order, withGlitches, secProp, *outputs):
         print('\n'.join(map(lambda x: '#    Exp: %s' % x, reducedGatesExp)))
 
         res = check(set(), order, reducedGatesExp, 0)
-        #allTuples = tupleEnumBis(reducedGatesExp, order)
-        #for t in allTuples:
-        #    if t not in allVerifiedTuples:
-        #        print('# Missing tuple [' + ', '.join(map(lambda u: '%s' % expNames[u], t)) + ']\n') 
         print('# Res for Barthe Algo: %s' % str(res))
         print('# Nb. NI calls: %d' % HWElement.nbNIcalls)
         if res:

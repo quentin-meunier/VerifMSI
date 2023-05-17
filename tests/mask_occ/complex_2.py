@@ -36,10 +36,11 @@ n3 = n2 + p0
 e = n3 & n2
 
 e.printMaskOcc()
+e.dump('graph.dot')
 
 res = tps(e)
 
-print('# Tps: %r (False expected)' % res)
+print('# Tps: %r (True expected)' % res)
 
 
 

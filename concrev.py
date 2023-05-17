@@ -31,6 +31,9 @@ def getExevRec(node, m, ss):
     if isinstance(node, ConstNode):
         return node
 
+    if isinstance(node, StrNode):
+        return node
+
     newChildren = []
     op = node.op
     for child in node.children:
@@ -52,6 +55,11 @@ def getExevRec(node, m, ss):
         return newChildren[0] << newChildren[1]
     elif op == '-':
         return -newChildren[0]
+    elif op == 'A':
+        if ArrayExp.allArrays[newChildren[0].strn].content == None:
+            print('*** Error: concrete evaluation of an array access is only possible with an initialized content' % node.symb)
+            sys.exit(1)
+        return Const(ArrayExp.allArrays[newChildren[0].strn].content[newChildren[1].cst], ArrayExp.allArrays[newChildren[0].strn].outWidth)
 
     if op == '&':
         res = ~0
@@ -68,9 +76,6 @@ def getExevRec(node, m, ss):
             res = (1 << node.width) - 1 - child.cst
         elif op == '+':
             res = (res + child.cst) % (1 << node.width)
-        elif op == 'A':
-            # FIXME
-            res = child.cst
         else:
             assert(False)
 
@@ -139,25 +144,7 @@ def getVarsList(*exps):
             allVarsNoBits.add(n)
 
     allVarsList = sorted(list(allVarsNoBits), key = lambda x: x.symb)
-    #print('2:')
-    #print(' '.join(map(lambda x: '%s' % x.symb, allVarsList)))
     return allVarsList, sharesSubst
-    
-
-#def getSecretVarsSet(*exps):
-#    allVars = set()
-#    for e in exps:
-#        allVars.update(e.secretVarOcc.keys())
-#    secretVarsSet  = set()
-#    for n in allVars:
-#        if '#' in n.symb:
-#            import re
-#            varName, b = re.split(r'#', n.symb)
-#            secretVarsSet.add(Node.symb2node[varName])
-#        else:
-#            secretVarsSet.add(n)
-#
-#    return secretVarsSet
     
 
 

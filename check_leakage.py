@@ -13,7 +13,7 @@ from .utils import *
 
 
 
-def checkPropVal(e, secProp, maxShareOcc):
+def checkPropVal(e, secProp, params):
     timerStart = timeit.default_timer()
 
     if e.hasWordOp:
@@ -23,11 +23,11 @@ def checkPropVal(e, secProp, maxShareOcc):
             if secProp == 'tps':
                 res = tps(e)
             elif secProp == 'ni':
-                res = ni(e, maxShareOcc)
+                res = ni(e, params)
             elif secProp == 'rni':
-                res = rni(e, maxShareOcc)
+                res = rni(e, params)
             elif secProp == 'pini':
-                res = pini(e, maxShareOcc)
+                res = pini(e, params)
             if not res:
                 e.wordAnalysisHasFailedOnSubExp = True
 
@@ -37,11 +37,11 @@ def checkPropVal(e, secProp, maxShareOcc):
             if secProp == 'tps':
                 res = tps(be)
             elif secProp == 'ni':
-                res = ni(be, maxShareOcc)
+                res = ni(be, params)
             elif secProp == 'rni':
-                res = rni(be, maxShareOcc)
+                res = rni(be, params)
             elif secProp == 'pini':
-                res = pini(be, maxShareOcc)
+                res = pini(be, params)
     else:
         if bitExpEnable():
             be = getBitDecomposition(e)
@@ -49,21 +49,21 @@ def checkPropVal(e, secProp, maxShareOcc):
             if secProp == 'tps':
                 res = tps(be)
             elif secProp == 'ni':
-                res = ni(be, maxShareOcc)
+                res = ni(be, params)
             elif secProp == 'rni':
-                res = rni(be, maxShareOcc)
+                res = rni(be, params)
             elif secProp == 'pini':
-                res = pini(be, maxShareOcc)
+                res = pini(be, params)
         else:
             usedBitExp = False
             if secProp == 'tps':
                 res = tps(e)
             elif secProp == 'ni':
-                res = ni(e, maxShareOcc)
+                res = ni(e, params)
             elif secProp == 'rni':
-                res = rni(e, maxShareOcc)
+                res = rni(e, params)
             elif secProp == 'pini':
-                res = pini(e, maxShareOcc)
+                res = pini(e, params)
 
     timerEnd = timeit.default_timer()
     time = timerEnd - timerStart
@@ -77,15 +77,15 @@ def checkTpsVal(e):
 def checkNIVal(e, maxShareOcc):
     return checkPropVal(e, 'ni', maxShareOcc)
 
-def checkRNIVal(e, maxShareOcc):
-    return checkPropVal(e, 'rni', maxShareOcc)
+def checkRNIVal(e, diff):
+    return checkPropVal(e, 'rni', diff)
 
-def checkPINIVal(e, maxShareOcc):
-    return checkPropVal(e, 'pini', maxShareOcc)
+def checkPINIVal(e, params):
+    return checkPropVal(e, 'pini', params)
 
 
 
-def checkPropTrans(e0, e1, secProp, maxShareOcc):
+def checkPropTrans(e0, e1, secProp, params):
     tpsTimerStart = timeit.default_timer()
 
     e = Concat(e0, e1)
@@ -96,9 +96,11 @@ def checkPropTrans(e0, e1, secProp, maxShareOcc):
             if secProp == 'tps':
                 res = tps(e)
             elif secProp == 'ni':
-                res = ni(e, maxShareOcc)
+                res = ni(e, params)
             elif secProp == 'rni':
-                res = rni(e, maxShareOcc)
+                res = rni(e, params)
+            elif secProp == 'pini':
+                res = pini(e, params)
             # FIXME: if only transition and no value, how to make the flag become true? check each exp independently?
             #if not res:
             #    e0.wordAnalysisHasFailedOnSubExp = True
@@ -111,9 +113,11 @@ def checkPropTrans(e0, e1, secProp, maxShareOcc):
             if secProp == 'tps':
                 res = tps(be)
             elif secProp == 'ni':
-                res = ni(be, maxShareOcc)
+                res = ni(be, params)
             elif secProp == 'rni':
-                res = rni(be, maxShareOcc)
+                res = rni(be, params)
+            elif secProp == 'pini':
+                res = pini(be, params)
     else:
         if bitExpEnable():
             be = getBitDecomposition(e)
@@ -121,17 +125,21 @@ def checkPropTrans(e0, e1, secProp, maxShareOcc):
             if secProp == 'tps':
                 res = tps(be)
             elif secProp == 'ni':
-                res = ni(be, maxShareOcc)
+                res = ni(be, params)
             elif secProp == 'rni':
-                res = rni(be, maxShareOcc)
+                res = rni(be, params)
+            elif secProp == 'pini':
+                res = pini(be, params)
         else:
             usedBitExp = False
             if secProp == 'tps':
                 res = tps(e)
             elif secProp == 'ni':
-                res = ni(e, maxShareOcc)
+                res = ni(e, params)
             elif secProp == 'rni':
-                res = rni(e, maxShareOcc)
+                res = rni(e, params)
+            elif secProp == 'pini':
+                res = pini(e, params)
 
     tpsTimerEnd = timeit.default_timer()
     tpsTime = tpsTimerEnd - tpsTimerStart
@@ -146,8 +154,11 @@ def checkTpsTrans(e0, e1):
 def checkNITrans(e0, e1, maxShareOcc):
     return checkPropTrans(e0, e1, 'ni', maxShareOcc)
 
-def checkRNITrans(e0, e1, maxShareOcc):
-    return checkPropTrans(e0, e1, 'rni', maxShareOcc)
+def checkRNITrans(e0, e1, diff):
+    return checkPropTrans(e0, e1, 'rni', diff)
+
+def checkPINITrans(e0, e1, params):
+    return checkPropTrans(e0, e1, 'pini', params)
 
 
 

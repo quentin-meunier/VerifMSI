@@ -53,9 +53,9 @@ def mergeConcatChildren(op, children):
                 for i in range(len(child.children)):
                     if child.children[i].width != firstConcatChild.children[i].width:
                         mergeConcat = False
+                        break
 
     if mergeConcat and numConcatChildren > 1:
-        modified = True
         newChildren = []
         xorsChildren = [[] for _ in range(len(firstConcatChild.children))]
         for c in children:
@@ -480,7 +480,8 @@ def simplifyCore(node, propagateExtractInwards, useSingleBitVariables):
                 break
 
             elif child.op == 'ZE' or child.op == 'SE':
-                ## FIXME: replace these operations with concat at creation?
+                # Note: These operations should not exist anymore as they are replaced with Concat at creation
+                #       The code is let for backward compatibility and in case of bug is found in the current version
                 extendNode = child
                 extendValue = extendNode.children[0].cst
                 exp = extendNode.children[1]
@@ -677,7 +678,7 @@ def simplifyCore(node, propagateExtractInwards, useSingleBitVariables):
 
             elif propagateExtractInwards and child.op == '~':
                 gchild = child.children[0]
-                newExtractNode = Extract(msbNode, lsbNode, gchild)
+                newExtractNode = Extract(msb, lsb, gchild)
                 newChildren0 = [newExtractNode]
                 op = '~'
                 break
@@ -738,7 +739,6 @@ def simplifyCore(node, propagateExtractInwards, useSingleBitVariables):
                     for b in range(msb + 1):
                         ai = ~Extract(b, b, child0)
                         if b != msb:
-                            si = ai ^ ci
                             ci = ai & ci
                     newChildren0 = [ai, ci]
                     op = '^'
@@ -785,8 +785,7 @@ def simplifyCore(node, propagateExtractInwards, useSingleBitVariables):
 
     modified = (newChildren0 != None)
     if not modified:
-        # A priori not necessary to copy the list since it is not modified
-        # But still maybe safer to copy it?
+        # Not necessary to copy the list since newChildren0 is not modified in the following
         #print_level(2, '# Node not modified by prologue')
         newChildren0 = node.children
 
@@ -804,9 +803,9 @@ def simplifyCore(node, propagateExtractInwards, useSingleBitVariables):
                 break
 
 
-    # ZeroExt(n, k) ^ ZeroExt(n, m) -> ZeroExt(n, k ^ m)
-    # FIXME: check that ZeroExt is not used anymore. It should be replaced by Concat(0, ...) everywhere
-    # Is this code is still useful for SignExt?
+    # ZeroExt(n, k) ^ ZeroExt(n, m) -> ZeroExt(n, k ^ m) / SignExt
+    # Note: These operations should not exist anymore as they are replaced with Concat at creation
+    #       The code is let for backward compatibility and in case of bug is found in the current version
     if op == '^' or op == '&' or op == '|':
         allChildrenZeroExt = True
         allChildrenSignExt = True
@@ -936,33 +935,34 @@ def simplifyCore(node, propagateExtractInwards, useSingleBitVariables):
         # FIXME: it is possible here to have a const(0) among newChildren
 
 
-        # GPow(a, n) ^ GPow(b, n) and n is a power of 2 -> GPow(a ^ b, n)
-        nbPowChildren = {}
-        for i in range(len(newChildren)):
-            child = newChildren[i]
-            if child.op == 'P':
-                gchild = child.children[1]
-                if isinstance(gchild, ConstNode) and gchild.cst in Node.powersTwo:
-                    if gchild in nbPowChildren:
-                        nbPowChildren[gchild] += 1
-                    else:
-                        nbPowChildren[gchild] = 1
+        if node.hasWordOp:
+            # GPow(a, n) ^ GPow(b, n) and n is a power of 2 -> GPow(a ^ b, n)
+            nbPowChildren = {}
+            for i in range(len(newChildren)):
+                child = newChildren[i]
+                if child.op == 'P':
+                    gchild = child.children[1]
+                    if isinstance(gchild, ConstNode) and gchild.cst in Node.powersTwo:
+                        if gchild in nbPowChildren:
+                            nbPowChildren[gchild] += 1
+                        else:
+                            nbPowChildren[gchild] = 1
 
-        for exp in nbPowChildren:
-            if nbPowChildren[exp] > 1:
-                modified = True
-                powChildren = []
-                i = 0
-                while i < len(newChildren):
-                    child = newChildren[i]
-                    if child.op == 'P' and exp is child.children[1]:
-                        powChildren.append(child.children[0])
-                        newChildren.pop(i)
-                        continue
-                    i += 1
-                newAddNode = simplify(OpNode('^', powChildren))
-                newPowNode = simplify(GPow(newAddNode, exp))
-                newChildren.append(newPowNode)
+            for exp in nbPowChildren:
+                if nbPowChildren[exp] > 1:
+                    modified = True
+                    powChildren = []
+                    i = 0
+                    while i < len(newChildren):
+                        child = newChildren[i]
+                        if child.op == 'P' and exp is child.children[1]:
+                            powChildren.append(child.children[0])
+                            newChildren.pop(i)
+                            continue
+                        i += 1
+                    newAddNode = simplify(OpNode('^', powChildren))
+                    newPowNode = simplify(GPow(newAddNode, exp))
+                    newChildren.append(newPowNode)
 
 
 
@@ -1027,27 +1027,28 @@ def simplifyCore(node, propagateExtractInwards, useSingleBitVariables):
             m = factorize('*', '+', newChildren, width)
             modified = modified or m
 
-        # GLog(x) + GLog(y) -> GLog(GMul(x, y))
-        numLogChildren = 0
-        for i in range(len(newChildren)):
-            child = newChildren[i]
-            if child.op == 'L':
-                numLogChildren += 1
-
-        if numLogChildren > 1:
-            modified = True
-            logChildren = []
-            i = 0
-            while i < len(newChildren):
+            # FIXME: this block was not under the wordOp condition before; recheck that tests still pass
+            # GLog(x) + GLog(y) -> GLog(GMul(x, y))
+            numLogChildren = 0
+            for i in range(len(newChildren)):
                 child = newChildren[i]
                 if child.op == 'L':
-                    logChildren.append(child.children[0])
-                    newChildren.pop(i)
-                    continue
-                i += 1
-            mulNode = simplify(OpNode('M', logChildren))
-            logNode = simplify(GLog(mulNode))
-            newChildren.append(logNode)
+                    numLogChildren += 1
+
+            if numLogChildren > 1:
+                modified = True
+                logChildren = []
+                i = 0
+                while i < len(newChildren):
+                    child = newChildren[i]
+                    if child.op == 'L':
+                        logChildren.append(child.children[0])
+                        newChildren.pop(i)
+                        continue
+                    i += 1
+                mulNode = simplify(OpNode('M', logChildren))
+                logNode = simplify(GLog(mulNode))
+                newChildren.append(logNode)
 
 
         if len(newChildren) == 0:
@@ -1067,6 +1068,7 @@ def simplifyCore(node, propagateExtractInwards, useSingleBitVariables):
             return setSimpEqAndReturn(node, child.children[0])
         else:
             return setSimpEqAndReturn(node, defaultNode(node, op, newChildren, modified))
+
 
     elif op == '&' or op == '|':
         # simplify a | (~a & b) to a | b

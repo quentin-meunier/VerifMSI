@@ -93,14 +93,14 @@ def getArrayAndOffset(addr):
 
     # FIXME: in case symbolic array of 32-bit integers is at adress 0x1000,
     # and offset is (k ^ m) + 4, array will be searched at address 0x1004 and it will fail
-    # this case will be implemented if encountered
+    # This case can be implemented if encountered, but it is very unlikely
     print('*** Error: symbolic address for symbolic array access does not contain array base address (address is %s)' % addr)
     sys.exit(1)
 
 
 def getArrayAndOffsetConcrete(addr):
     # FIXME: deal with fully symbolic arrays (return array access from constant index): return arr, offset
-    # and semi-symbolic arrays (return constant value from constant index): return None, None
+    #        or is it useless?
     assert(isinstance(addr, int))
     return None, None
 

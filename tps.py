@@ -54,18 +54,18 @@ def ni(nodeIn, maxShareOcc, verbose = False):
     return checkProperty(nodeIn, 'ni', maxShareOcc, verbose)
 
 
-def rni(nodeIn, maxShareOcc, verbose = False):
+def rni(nodeIn, diff, verbose = False):
     if len(nodeIn.secretVarOcc) != 0:
         print('*** Error: RNI verification should use a share representation and not explicit secret variables')
         sys.exit(1)
-    return checkProperty(nodeIn, 'rni', maxShareOcc, verbose)
+    return checkProperty(nodeIn, 'rni', diff, verbose)
 
 
-def pini(nodeIn, maxShareOcc, verbose = False):
+def pini(nodeIn, params, verbose = False):
     if len(nodeIn.secretVarOcc) != 0:
         print('*** Error: PINI verification should use a share representation and not explicit secret variables')
         sys.exit(1)
-    return checkProperty(nodeIn, 'pini', maxShareOcc, verbose)
+    return checkProperty(nodeIn, 'pini', params, verbose)
 
 
 def checkProperty(nodeIn, secProp, params, verbose):
@@ -88,7 +88,6 @@ def checkProperty(nodeIn, secProp, params, verbose):
         if verbose:
             print('# Starting iteration %d' % cpt)
             print('# e = %s' % node)
-        #node.dump('dot/graph_%d.dot' % cpt)
         cpt += 1
 
         if secProp == 'tps':
@@ -117,21 +116,14 @@ def checkProperty(nodeIn, secProp, params, verbose):
                 return True
         elif secProp == 'pini':
             isPINI = True
-            #print('# maxShareOcc: %d' % maxShareOcc)
             #print('# outputIndexes: %s' % ' '.join(map(lambda x: '%d' % x, outputIndexes)))
             for s in node.shareOcc:
-                #print('# secret %s' % s.symb)
                 nbOcc = 0
                 for sh in node.shareOcc[s]:
-                    num = int(sh.symb[-2]) # FIXME: fails if ten or more shares... add num in node??
-                    #print('# share %s' % sh.symb)
-                    #print('# share num: %d' % num)
+                    num = int(sh.symb[-2]) # FIXME: slow and fails if ten or more shares... add share num in node??
                     if num not in outputIndexes:
                         nbOcc += 1
-                        #print('# num not in outputIndexes')
-                #print('# nbOcc: %d' % nbOcc)
                 if nbOcc > maxShareOcc:
-                    #print('# isPini = False')
                     isPINI = False
                     break
             if isPINI:
@@ -147,7 +139,7 @@ def checkProperty(nodeIn, secProp, params, verbose):
         # - For this CTR Base, choose the CTR with the max height for the same count
         maskingMaskOcc = node.maskingMaskOcc
         otherMaskOcc = node.otherMaskOcc
-        minOtherOcc = 1000000 # FIXME...
+        minOtherOcc = 1000000
         minMaskingOcc = 1000000
         minRootMask = False
         selMask = None
@@ -159,7 +151,7 @@ def checkProperty(nodeIn, secProp, params, verbose):
             except:
                 nbOtherOcc = 0
 
-            # QM FIXME: try to change the condition nbMaskingOcc == 1 with the fact that the number of maskingOcc has decreased since the last time the mask was taken?
+            # FIXME: change the condition nbMaskingOcc == 1 with the fact that the number of maskingOcc has strictly decreased since the last time the mask was taken?
             if m in masksTaken and not (nbMaskingOcc == 1 and nbOtherOcc == 0):
                 continue
             
@@ -175,39 +167,7 @@ def checkProperty(nodeIn, secProp, params, verbose):
                 minOtherOcc = nbOtherOcc
                 minMaskingOcc = nbMaskingOcc
 
-        # Enable the selection of masks at the root of the Concat
-        #if selMask == None:
-        #    for m in maskingMaskOcc:
-        #        nbMaskingOcc = len(maskingMaskOcc[m])
-    
-        #        try:
-        #            nbOtherOcc = len(otherMaskOcc[m])
-        #        except:
-        #            nbOtherOcc = 0
-    
-        #        # QM FIXME: try to change the condition nbMaskingOcc == 1 with the fact that the number of maskingOcc has decreased since the last time the mask was taken?
-        #        if m in masksTaken and not (nbMaskingOcc == 1 and nbOtherOcc == 0):
-        #            continue
-        #        
-        #        # Heuristic:
-        #        # 1. First, minimize the number of otherOcc
-        #        # 2. For the masks with a min number of otherOcc, minimize the number of maskingOcc
-        #        # (Old heuristic: minimize total number of occurrences)
-        #        if nbOtherOcc < minOtherOcc or (nbOtherOcc == minOtherOcc and nbMaskingOcc < minMaskingOcc):
-        #            selMask = m
-        #            minOtherOcc = nbOtherOcc
-        #            minMaskingOcc = nbMaskingOcc
-
-
         if selMask == None:
-            #removeFromMasksTaken = set()
-            #for m in masksTaken:
-            #    if len(maskingMaskOcc[m]) == 1 and (m not in otherMaskOcc or otherMaskOcc[m] == 0):
-            #        removeFromMasksTaken.add(m)
-            #if len(removeFromMasksTaken) != 0:
-            #    for m in removeFromMasksTaken:
-            #        masksTaken.remove(m)
-            #    continue
             if verbose:
                 print('# No mask can be taken')
             return False
@@ -237,7 +197,11 @@ def checkProperty(nodeIn, secProp, params, verbose):
         if verbose:
             print('# Choosing following ctr with a height of %d: %s' % (maxHeight, selCtr))
 
-        # FIXME: do a deterministic choice? (for each of the three choices, add a comparison on node hash)
+        # FIXME: currently the results is not deterministic, and a some verifications can either
+        #        succeed or fail, even if it is a very rare case
+        #        There are three non deterministic choices, and in order to make them deterministic,
+        #        we can for example take the min or max of the node number
+        #        I still expect this to slow down the execution time a little...
 
         masksTaken.add(selMask)
         node = getReplacedGraph(node, selMask, selCtr)
@@ -245,8 +209,6 @@ def checkProperty(nodeIn, secProp, params, verbose):
         if verbose:
             print('# Replacing %s with %s' % (selCtr, selMask))
             print('# and other occurrences of %s with %s' % (selMask, selCtr))
-
-        #node.dump('dot/graph_%d_end.dot' % (cpt - 1))
 
         # Simplify
         node = simplify(node)

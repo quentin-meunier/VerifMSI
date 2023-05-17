@@ -47,6 +47,7 @@ e = n5 + n7
 
 
 e.printMaskOcc()
+e.dump("graph.dot")
 
 res = tps(e)
 
