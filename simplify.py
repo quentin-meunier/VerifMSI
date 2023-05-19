@@ -921,7 +921,7 @@ def simplifyCore(node, propagateExtractInwards, useSingleBitVariables):
 
 
         # a * b ^ a * c -> a * (b ^ c)
-        # Remark: the factorisation is not unique (is it a problem?)
+        # Remark: the factorisation is not unique
         #   a * b ^ a * c ^ b * c
         # = a * (b ^ c) ^ b * c
         # = b * (a ^ c) ^ a * c
