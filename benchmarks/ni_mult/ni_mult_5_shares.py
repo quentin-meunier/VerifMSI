@@ -18,7 +18,7 @@ circuitFilename = 'circuit.dot'
 
 def usage():
     print('Usage: %s [options]' % os.path.basename(__file__))
-    print('   This script contains a VerifMSI description of a circuit implementing the \'NI Mult\' algorithm from [?] with 5 shares.')
+    print('   This script contains a VerifMSI description of a circuit implementing the \'NI Mult\' algorithm from [1] with 5 shares.')
     print('   This file was generated using the script generate_ni_mult.py')
     print('Options:')
     print('-o,  --order <n>            : Set the order of the verification to (default: %d)' % order)
@@ -27,6 +27,9 @@ def usage():
     print('-ng, --without-glitches     : Do not consider glitch propagation throughout gates (defaut: %s)' % (withGlitches and 'No' or 'Yes'))
     print('-d, --dump-circuit          : Dump the circuit in dot format in a file named \'%s\' (default: %r)' % (circuitFilename, dumpCircuit))
     print('-c, --check-functionality   : Check the circuit functionality via exhaustive evaluation (default: %r)' % checkFunctionality)
+    print('')
+    print('[1] Bordes, N., & Karpman, P. (2021). Fast verification of masking schemes in characteristic two. 40th Annual International Conference on the Theory and Applications of Cryptographic Techniques, 2021. Springer International Publishing.')
+
 
 
 def ni_mult_5_shares(*argv):

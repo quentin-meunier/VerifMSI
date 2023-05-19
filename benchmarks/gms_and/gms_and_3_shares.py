@@ -19,7 +19,7 @@ circuitFilename = 'circuit.dot'
 
 def usage():
     print('Usage: %s [options]' % os.path.basename(__file__))
-    print('   This script contains a VerifMSI description of a circuit implementing the logical AND following the GMS scheme with 3 shares.')
+    print('   This script contains a VerifMSI description of a circuit implementing the logical AND following the GMS scheme with 3 shares from [1].')
     print('Options:')
     print('-o,  --order <n>            : Set the order of the verification to (default: %s)' % order)
     print('-p,  --prop                 : Set security property to verify: either \'ni\' (Non-Interference), \'sni\' (Strong Non-Interference) \'rni\' (Relaxed Non-Interference) or \'tps\' (Treshold Probing Security). NI and SNI use a share description for the inputs, while TPS uses a secrets + masks description (default: %s)' % prop)
@@ -27,6 +27,8 @@ def usage():
     print('-ng, --without-glitches     : Do not consider glitch propagation throughout gates (defaut: %s)' % (withGlitches and 'No' or 'Yes'))
     print('-d, --dump-circuit          : Dump the circuit in dot format in a file named \'%s\' (default: %r)' % (circuitFilename, dumpCircuit))
     print('-c, --check-functionality   : Check the circuit functionality via exhaustive evaluation (default: %r)' % checkFunctionality)
+    print('')
+    print('[1] Reparaz, O., Bilgin, B., Nikova, S., Gierlichs, B., & Verbauwhede, I. (2015). Consolidating masking schemes. 35th Annual Cryptology Conference, 2015. Springer Berlin Heidelberg.')
 
 
 

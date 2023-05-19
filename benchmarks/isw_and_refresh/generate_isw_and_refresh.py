@@ -17,14 +17,14 @@ order = 3
 prop = 'tps'
 withGlitches = False
 withAdditionalRand = False
-outfilePrefix = 'isw_and_gen_refresh'
+outfilePrefix = 'isw_and_refresh_gen'
 outfile = None
 
 
 
 def usage():
     print('Usage: %s [options]' % os.path.basename(__file__))
-    print('   This script generates a VerifMSI file describing a circuit implementing the logical AND following the ISW scheme with share refreshing.')
+    print('   This script generates a VerifMSI file describing a circuit implementing the logical AND following the ISW scheme with share refreshing from [1].')
     print('Options:')
     print('-f,  --outfile <file>       : Set the name of the generated output file to <file> (default: %s)' % outfile)
     print('-n,  --nb-shares <n>        : Set the number of shares in the scheme to <n> (default: %s)' % nbShares)
@@ -35,6 +35,8 @@ def usage():
     print('-r,  --with-rand            : Use an additional random for computing expressions of the form a_i & b_j,')
     print('                              to transform them into ((a_i ^ r) & b_j) ^ (r & b_j) (defaut: %s)' % (withAdditionalRand and 'Yes' or 'No'))
     print('-nr, --with-rand            : Do not use additional random for computing expressions of the form a_i & b_j (default: %s)' % (withAdditionalRand and 'No' or 'Yes'))
+    print('')
+    print('[1] De Cnudde, T., Reparaz, O., Bilgin, B., Nikova, S., Nikov, V., & Rijmen, V. (2016). Masking AES with shares in hardware. In Cryptographic Hardware and Embedded Systems (CHES) 2016. Springer Berlin Heidelberg.')
 
 
 
@@ -123,7 +125,7 @@ import sys
     
     content += '''def usage():
     print('Usage: %%s [options]' %% os.path.basename(__file__))
-    print('   This script contains a VerifMSI description of a circuit implementing the logical AND following the ISW scheme with %d shares with share refreshing.')
+    print('   This script contains a VerifMSI description of a circuit implementing the logical AND following the ISW scheme with %d shares with share refreshing from [1].')
     print('   This file was generated using the script generate_isw_and_refresh.py')
     print('Options:')
     print('-o,  --order <n>            : Set the order of the verification to (default: %%d)' %% order)
@@ -132,6 +134,8 @@ import sys
     print('-ng, --without-glitches     : Do not consider glitch propagation throughout gates (defaut: %%s)' %% (withGlitches and 'No' or 'Yes'))
     print('-d, --dump-circuit          : Dump the circuit in dot format in a file named \\\'%%s\\\' (default: %%r)' %% (circuitFilename, dumpCircuit))
     print('-c, --check-functionality   : Check the circuit functionality via exhaustive evaluation (default: %%r)' %% checkFunctionality)
+    print('')
+    print('[1] De Cnudde, T., Reparaz, O., Bilgin, B., Nikova, S., Nikov, V., & Rijmen, V. (2016). Masking AES with shares in hardware. In Cryptographic Hardware and Embedded Systems (CHES) 2016. Springer Berlin Heidelberg.')
 ''' % (nbShares)
 
     content += '\n'

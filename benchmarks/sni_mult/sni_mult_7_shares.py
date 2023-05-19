@@ -19,7 +19,7 @@ circuitFilename = 'circuit.dot'
 
 def usage():
     print('Usage: %s [options]' % os.path.basename(__file__))
-    print('   This script contains a VerifMSI description a circuit implementing the \'SNI Mult\' algorithm [?] with 7 shares.')
+    print('   This script contains a VerifMSI description a circuit implementing the \'SNI Mult\' algorithm [1] with 7 shares.')
     print('Options:')
     print('-o,  --order <n>            : Set the order of the verification to (default: %d)' % order)
     print('-p,  --prop                 : Set security property to verify: either \'ni\' (Non-Interference), \'sni\' (Strong Non-Interference) \'rni\' (Relaxed Non-Interference), \'pini\' (Probing-Isolating Non-Interference) or \'tps\' (Treshold Probing Security). NI, SNI, RNI and PINI use a share description for the inputs, while TPS uses a secrets + masks description (default: %s)' % prop)
@@ -27,6 +27,8 @@ def usage():
     print('-ng, --without-glitches     : Do not consider glitch propagation throughout gates (defaut: %s)' % (withGlitches and 'No' or 'Yes'))
     print('-d, --dump-circuit          : Dump the circuit in dot format in a file named \'%s\' (default: %r)' % (circuitFilename, dumpCircuit))
     print('-c, --check-functionality   : Check the circuit functionality via exhaustive evaluation (default: %r)' % checkFunctionality)
+    print('')
+    print('[1] Bordes, N., & Karpman, P. (2021). Fast verification of masking schemes in characteristic two. 40th Annual International Conference on the Theory and Applications of Cryptographic Techniques, 2021. Springer International Publishing.')
 
 
 def sni_mult_7_shares(*argv):

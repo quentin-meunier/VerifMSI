@@ -17,7 +17,7 @@ outfile = None
 
 def usage():
     print('Usage: %s [options]' % os.path.basename(__file__))
-    print('   This script generates a VerifMSI file describing a circuit implementing the logical AND following the DOM scheme.')
+    print('   This script generates a VerifMSI file describing a circuit implementing the logical AND following the DOM scheme from [1].')
     print('Options:')
     print('-f,  --outfile <file>       : Set the name of the generated output file to <file> (default: %s)' % outfile)
     print('-n,  --nb-shares <n>        : Set the number of shares in the scheme to <n> (default: %d)' % nbShares)
@@ -25,6 +25,8 @@ def usage():
     print('-p,  --prop                 : Set security property to verify: either \'ni\' (Non-Interference), \'sni\' (Strong Non-Interference) \'rni\' (Relaxed Non-Interference), \'pini\' (Probing-Isolating Non-Interference) or \'tps\' (Treshold Probing Security). NI, SNI, RNI and PINI use a share description for the inputs, while TPS uses a secrets + masks description (default: %s)' % prop)
     print('-g,  --with-glitches        : Consider glitch propagation throughout gates (defaut: %s)' % (withGlitches and 'Yes' or 'No'))
     print('-ng, --without-glitches     : Do not consider glitch propagation throughout gates (defaut: %s)' % (withGlitches and 'No' or 'Yes'))
+    print('')
+    print('[1] Groß, H., Mangard, S., & Korak, T. (2017). An efficient side-channel protected AES implementation with arbitrary protection order. In Topics in Cryptology–CT-RSA 2017: The Cryptographers\' Track at the RSA Conference 2017, Springer International Publishing.')
 
 
 
@@ -108,7 +110,7 @@ import sys
     
     content += '''def usage():
     print('Usage: %%s [options]' %% os.path.basename(__file__))
-    print('   This script contains a VerifMSI description of a circuit implementing the logical AND following the DOM scheme with %d shares.')
+    print('   This script contains a VerifMSI description of a circuit implementing the logical AND following the DOM scheme from [1] with %d shares.')
     print('   This file was generated using the script generate_dom_and.py')
     print('Options:')
     print('-o,  --order <n>            : Set the order of the verification to (default: %%d)' %% order)
@@ -117,6 +119,8 @@ import sys
     print('-ng, --without-glitches     : Do not consider glitch propagation throughout gates (defaut: %%s)' %% (withGlitches and 'No' or 'Yes'))
     print('-d, --dump-circuit          : Dump the circuit in dot format in a file named \\\'%%s\\\' (default: %%r)' %% (circuitFilename, dumpCircuit))
     print('-c, --check-functionality   : Check the circuit functionality via exhaustive evaluation (default: %%r)' %% checkFunctionality)
+    print('')
+    print('[1] Groß, H., Mangard, S., & Korak, T. (2017). An efficient side-channel protected AES implementation with arbitrary protection order. In Topics in Cryptology–CT-RSA 2017: The Cryptographers\\\' Track at the RSA Conference 2017, Springer International Publishing.')
 ''' % (nbShares)
 
     content += '\n'
