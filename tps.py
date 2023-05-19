@@ -40,7 +40,7 @@ def getReplacedGraph(node, selMask, childToReplace):
 
 
 
-def tps(nodeIn, verbose = False):
+def tps(nodeIn, verbose = True):
     if len(nodeIn.shareOcc) != 0:
         print('*** Error: Threshold Probing verification should not use a share representation but explicit secret variables and masks')
         sys.exit(1)

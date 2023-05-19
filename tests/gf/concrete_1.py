@@ -5,6 +5,7 @@ from __future__ import print_function
 from verif_msi import *
 
 # GMul(cst, GLog(x)) = GLog(GPow(x, cst))
+# Fails...
 
 for i in range(1, 256):
     for j in range(1, 256):

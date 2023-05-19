@@ -17,19 +17,19 @@ exp_1 = Extract(Const(7, 3), Const(0, 0), ((SignExt(Const(31, 5), Extract(Const(
 
 
 rud, sid = getDistribWithExev(exp_0)
-print('LeakageVerif exp 0')
+print('exp 0')
 print('RUD: %r' % rud)
 print('SID: %r' % sid)
 
 
 rud, sid = getDistribWithExev(exp_1)
-print('LeakageVerif exp 1')
+print('exp 1')
 print('RUD: %r' % rud)
 print('SID: %r' % sid)
 
 
 rud, sid = getDistribWithExev(exp_0 ^ exp_1)
-print('LeakageVerif exp 0 ^ exp 1')
+print('exp 0 ^ exp 1')
 print('RUD: %r' % rud)
 print('SID: %r' % sid)
 

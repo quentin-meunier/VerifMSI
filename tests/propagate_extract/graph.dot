@@ -1,3 +1,0 @@
-digraph g {
-   N0 [shape=record, label="{Symbol: a [P]}"];
-}
