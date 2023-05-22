@@ -6,8 +6,10 @@ VerifMSI is a python3 library extending [LeakageVerif](https://github.com/quenti
 
 VerifMSI offers a set of constructs and functions for writing and verifying symbolic expressions, at algorithmic or gate level. A symbolic expression in VerifMSI is a fixed width expression comprising operations on constants and symbolic variables. Each symbolic variable has a type between secret, share, mask and public. VerifMSI verifies that the distribution of the expression value is independent from the secret values it contains, considering that mask variables follow an random uniform distribution.
 
-This work has been accepeted at the SECRYPT 2023 conference as a short paper (reference to come), and available as full paper under the following reference:
-Q. L. Meunier, A. R. Taleb "VerifMSI: Practical Verification of Masking Schemes Implementation", (complete)
+This work has been accepted at the SECRYPT 2023 conference as a short paper:
+(reference to come),
+and is available as full paper on the IACR eprint under the following reference:
+(complete reference to come)
 [Link](link)
 
 
