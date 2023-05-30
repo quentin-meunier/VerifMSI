@@ -246,8 +246,6 @@ def factorize(mulOp, addOp, newChildren, width):
                         k = 0
                         while k < len(firstMul.children):
                             if equivalence(firstMul.children[k], newChildren[j]):
-                                hasChanged = True
-                                newGrandChildren = None
                                 if mulOp == '*' or mulOp == 'M':
                                     factor = newChildren[j]
                                     # Determining the xor operands
@@ -262,9 +260,15 @@ def factorize(mulOp, addOp, newChildren, width):
                                         xorNode = simplify(xorLeftNode ^ Const(0x1, width))
                                     elif mulOp == '*':
                                         xorNode = simplify(xorLeftNode + Const(0x1, width))
+                                    hasChanged = True
                                     newGrandChildren = [factor, xorNode]
+                                elif mulOp == '&' and addOp == '^':
+                                    pass
                                 else:
+                                    hasChanged = True
+                                    newGrandChildren = None
                                     newChildren.pop(i)
+                                    modified = True
                                 break
                             k += 1
                     if hasChanged and newGrandChildren != None:
@@ -483,7 +487,6 @@ def simplifyCore(node, propagateExtractInwards, useSingleBitVariables):
                 # Note: These operations should not exist anymore as they are replaced with Concat at creation
                 #       The code is let for backward compatibility and in case of bug is found in the current version
                 extendNode = child
-                extendValue = extendNode.children[0].cst
                 exp = extendNode.children[1]
                 if msb <= exp.width - 1:
                     # Remove SE or ZE
@@ -782,7 +785,6 @@ def simplifyCore(node, propagateExtractInwards, useSingleBitVariables):
                 break
 
 
-
     modified = (newChildren0 != None)
     if not modified:
         # Not necessary to copy the list since newChildren0 is not modified in the following
@@ -801,7 +803,6 @@ def simplifyCore(node, propagateExtractInwards, useSingleBitVariables):
             if newChildren[i] is not newChildren0[i]:
                 modified = True
                 break
-
 
     # ZeroExt(n, k) ^ ZeroExt(n, m) -> ZeroExt(n, k ^ m) / SignExt
     # Note: These operations should not exist anymore as they are replaced with Concat at creation
@@ -1508,7 +1509,6 @@ def simplifyExtract(node):
         return ConstNodeFromExtract(msb, lsb, child)
     elif child.op == 'SE' or child.op == 'ZE':
         extendNode = child
-        extendValue = extendNode.children[0].cst
         gchild = extendNode.children[1]
         if msb <= gchild.width - 1:
             # Remove SE or ZE
@@ -1594,8 +1594,6 @@ def simplifyExtract(node):
 
     elif child.op == 'E':
         # Extract(m, l, Extract(v, u, e)) -> Extract(m + u, l + u, e)
-        gMsbNode = child.children[0]
-        gMsb = gMsbNode.cst
         gLsbNode = child.children[1]
         gLsb = gLsbNode.cst
         gchild = child.children[2]
