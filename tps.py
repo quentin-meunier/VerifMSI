@@ -98,6 +98,7 @@ def checkProperty(nodeIn, secProp, params, verbose):
         elif secProp == 'ni':
             isNI = True
             for s in node.shareOcc:
+                #print('len(node.shareOcc[s]) : %d - maxShareOcc : %d' % (len(node.shareOcc[s]), maxShareOcc));
                 if len(node.shareOcc[s]) > maxShareOcc:
                     isNI = False
                     break
@@ -131,6 +132,8 @@ def checkProperty(nodeIn, secProp, params, verbose):
 
 
         if len(node.currentlyMasking) != 0:
+            if verbose:
+                print('# Masking mask, return True')
             return True
  
         # Choice of CTR:

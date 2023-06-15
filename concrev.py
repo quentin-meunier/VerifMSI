@@ -11,20 +11,18 @@ from .node import *
 
 
 
-def getExevRec(node, m, ss):
+def getExevRec(node, m):
 
     if isinstance(node, SymbNode):
-        if node in m.keys():
+        if node in m:
             return m[node]
         if '#' in node.symb:
             import re
             n, b = re.split(r'#', node.symb)
             node = Node.symb2node[n]
             bit = int(b)
-            if node in m.keys():
+            if node in m:
                 return Extract(bit, bit, m[node])
-        if node in ss:
-            return getExevRec(ss[node], m, ss)
         print('*** Error: Value for symbol %s not specified' % node.symb)
         sys.exit(1)
 
@@ -34,52 +32,60 @@ def getExevRec(node, m, ss):
     if isinstance(node, StrNode):
         return node
 
+    if node in m:
+        return m[node]
+
     newChildren = []
     op = node.op
     for child in node.children:
-        newChildren.append(getExevRec(child, m, ss))
+        newChildren.append(getExevRec(child, m))
  
+    for child in newChildren:
+        assert(isinstance(child, ConstNode))
+
     if op == 'E':
-        return Extract(*newChildren)
+        res = Extract(*newChildren)
     elif op == 'ZE':
-        return ZeroExt(*newChildren)
+        res = ZeroExt(*newChildren)
     elif op == 'SE':
-        return SignExt(*newChildren)
+        res = SignExt(*newChildren)
     elif op == 'C':
-        return Concat(*newChildren[::-1])
+        res = Concat(*newChildren[::-1])
     elif op == 'LS':
-        return LShR(*newChildren)
+        res = LShR(*newChildren)
     elif op == '>>':
-        return newChildren[0] >> newChildren[1]
+        res = newChildren[0] >> newChildren[1]
     elif op == '<<':
-        return newChildren[0] << newChildren[1]
+        res = newChildren[0] << newChildren[1]
     elif op == '-':
-        return -newChildren[0]
+        res = -newChildren[0]
     elif op == 'A':
         if ArrayExp.allArrays[newChildren[0].strn].content == None:
             print('*** Error: concrete evaluation of an array access is only possible with an initialized content' % node.symb)
             sys.exit(1)
-        return Const(ArrayExp.allArrays[newChildren[0].strn].content[newChildren[1].cst], ArrayExp.allArrays[newChildren[0].strn].outWidth)
-
-    if op == '&':
-        res = ~0
+        res = Const(ArrayExp.allArrays[newChildren[0].strn].content[newChildren[1].cst], ArrayExp.allArrays[newChildren[0].strn].outWidth)
     else:
-        res = 0
-    for child in newChildren:
-        if op == '^':
-            res = res ^ child.cst
-        elif op == '&':
-            res = res & child.cst
-        elif op == '|':
-            res = res | child.cst
-        elif op == '~':
-            res = (1 << node.width) - 1 - child.cst
-        elif op == '+':
-            res = (res + child.cst) % (1 << node.width)
+        if op == '&':
+            res = ~0
         else:
-            assert(False)
+            res = 0
+        for child in newChildren:
+            if op == '^':
+                res = res ^ child.cst
+            elif op == '&':
+                res = res & child.cst
+            elif op == '|':
+                res = res | child.cst
+            elif op == '~':
+                res = (1 << node.width) - 1 - child.cst
+            elif op == '+':
+                res = (res + child.cst) % (1 << node.width)
+            else:
+                assert(False)
+        res = Const(res, node.width)
 
-    return Const(res, node.width)
+    m[node] = res
+    return res
 
 
 
@@ -95,8 +101,10 @@ def compareExpsWithExevRec(e0, e1, allVars, sharesSubst, idx, m):
             m[var] = None
         return None, None, None
     else:
-        v0 = getExevRec(e0, m, sharesSubst)
-        v1 = getExevRec(e1, m, sharesSubst)
+        for s in sharesSubst:
+            m[s] = getExevRec(sharesSubst[s], m)
+        v0 = getExevRec(e0, m)
+        v1 = getExevRec(e1, m)
         if v0.cst == v1.cst and v0.width == v1.width:
             return None, None, None
         else:
@@ -145,7 +153,7 @@ def getVarsList(*exps):
 
     allVarsList = sorted(list(allVarsNoBits), key = lambda x: x.symb)
     return allVarsList, sharesSubst
-    
+ 
 
 
 def compareExpsWithExev(e0, e1):
@@ -163,14 +171,14 @@ def compareExpsWithRandev(e0, e1, nbEval):
         m = {}
         for v in allVarsList:
             m[v] = Const(random.randrange(0, (1 << v.width)), v.width)
+        for s in sharesSubst:
+            m[s] = getExevRec(sharesSubst[s], m)
 
-        v0 = getExevRec(e0, m, sharesSubst)
-        v1 = getExevRec(e1, m, sharesSubst)
+        v0 = getExevRec(e0, m)
+        v1 = getExevRec(e1, m)
         if v0.cst != v1.cst or v0.width != v1.width:
             return m, v0, v1
     return None, None, None
-
-
 
 
 
@@ -182,7 +190,7 @@ def getDistribRefBis(e0, distribRef, nonSecretVars, idx, m):
             m[var] = Const(val, var.width)
             getDistribRefBis(e0, distribRef, nonSecretVars, idx + 1, m)
     else:
-        v = getExevRec(e0, m, {}).cst
+        v = getExevRec(e0, m).cst
         distribRef[v] += 1
 
 
@@ -205,7 +213,7 @@ def getDistribWithExevRecBis(e0, distrib, distribRef, nonSecretVars, idx, m):
             m[var] = Const(val, var.width)
             getDistribWithExevRecBis(e0, distrib, distribRef, nonSecretVars, idx + 1, m)
     else:
-        v = getExevRec(e0, m, {}).cst
+        v = getExevRec(e0, m).cst
         distrib[v] += 1
 
 

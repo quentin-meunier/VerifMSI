@@ -13,16 +13,15 @@ b0, b1, b2 = getPseudoShares(k1, 3)
 
 e = a0 ^ a1 ^ b1 ^ b2
 e = e | (a0 & b1)
+checkTpsResult(e, True)
 
-print('e : %s' % e)
-res = checkTpsVal(e)
-print('Result: %r (True expected)' % res[0])
+#print('e : %s' % e)
+
 
 f = (a2 ^ m ^ b0)
 g = Concat(e, f)
+checkTpsResult(g, True)
 
-res = checkTpsVal(g)
-print('Result: %r (True expected)' % res[0])
 
 
 

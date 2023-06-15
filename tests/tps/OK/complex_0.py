@@ -17,29 +17,17 @@ z2_4 = symbol('z2_4', 'M', 1)
 z3_4 = symbol('z3_4', 'M', 1)
 
 
+
 e = Concat(a2, z3_4,
     ((b ^ b3) & a3) ^ z1_4 ^ z2_4 ^ z3_4 ^ z0_4 ^ (a & b3),
     z1_4 ^ ((a2 ^ a) & b3) ^ z2_4 ^ z0_4 ^ ((b ^ b2 ^ b3) & a3))
 
-res, dummy, time = checkTpsVal(e)
-
-if res:
-    print('# TPS')
-else:
-    print('# Not TPS')
+checkTpsResult(e, True)
 
 
 e = ((b ^ b3) & a3) ^ (a & b3) ^ ((a2 ^ a) & b3) ^ (b2 & a3)
 
-res, dummy, time = checkTpsVal(e)
-
-if res:
-    print('# TPS')
-else:
-    print('# Not TPS')
-
-
-
+checkTpsResult(e, True)
 
 
 e = Concat(((b ^ b3) & a3) ^ z1_4 ^ z2_4 ^ z3_4 ^ z0_4 ^ (a & b3),
@@ -47,12 +35,6 @@ e = Concat(((b ^ b3) & a3) ^ z1_4 ^ z2_4 ^ z3_4 ^ z0_4 ^ (a & b3),
            z1_4 ^ ((a2 ^ a) & b3) ^ z2_4 ^ z0_4 ^ ((b ^ b2 ^ b3) & a3),
            z3_4)
 
-res, dummy, time = checkTpsVal(e)
-
-if res:
-    print('# TPS')
-else:
-    print('# Not TPS')
-
+checkTpsResult(e, True)
 
 
