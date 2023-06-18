@@ -32,8 +32,10 @@ registerArray('sbox', 8, 8, None, 256, None, sbox)
 exp = getArrayByName('sbox')[m]
 
 rud, sid = getDistribWithExev(exp)
-print('RUD: %r' % rud)
-print('SID: %r' % sid)
+if rud and sid:
+    print('OK')
+else:
+    print('KO')
 
 
 

@@ -11,106 +11,6 @@ from .node import *
 
 
 
-def getExevRec(node, m):
-
-    if isinstance(node, SymbNode):
-        if node in m:
-            return m[node]
-        if '#' in node.symb:
-            import re
-            n, b = re.split(r'#', node.symb)
-            node = Node.symb2node[n]
-            bit = int(b)
-            if node in m:
-                return Extract(bit, bit, m[node])
-        print('*** Error: Value for symbol %s not specified' % node.symb)
-        sys.exit(1)
-
-    if isinstance(node, ConstNode):
-        return node
-
-    if isinstance(node, StrNode):
-        return node
-
-    if node in m:
-        return m[node]
-
-    newChildren = []
-    op = node.op
-    for child in node.children:
-        newChildren.append(getExevRec(child, m))
- 
-    for child in newChildren:
-        assert(isinstance(child, ConstNode))
-
-    if op == 'E':
-        res = Extract(*newChildren)
-    elif op == 'ZE':
-        res = ZeroExt(*newChildren)
-    elif op == 'SE':
-        res = SignExt(*newChildren)
-    elif op == 'C':
-        res = Concat(*newChildren[::-1])
-    elif op == 'LS':
-        res = LShR(*newChildren)
-    elif op == '>>':
-        res = newChildren[0] >> newChildren[1]
-    elif op == '<<':
-        res = newChildren[0] << newChildren[1]
-    elif op == '-':
-        res = -newChildren[0]
-    elif op == 'A':
-        if ArrayExp.allArrays[newChildren[0].strn].content == None:
-            print('*** Error: concrete evaluation of an array access is only possible with an initialized content' % node.symb)
-            sys.exit(1)
-        res = Const(ArrayExp.allArrays[newChildren[0].strn].content[newChildren[1].cst], ArrayExp.allArrays[newChildren[0].strn].outWidth)
-    else:
-        if op == '&':
-            res = ~0
-        else:
-            res = 0
-        for child in newChildren:
-            if op == '^':
-                res = res ^ child.cst
-            elif op == '&':
-                res = res & child.cst
-            elif op == '|':
-                res = res | child.cst
-            elif op == '~':
-                res = (1 << node.width) - 1 - child.cst
-            elif op == '+':
-                res = (res + child.cst) % (1 << node.width)
-            else:
-                assert(False)
-        res = Const(res, node.width)
-
-    m[node] = res
-    return res
-
-
-
-
-def compareExpsWithExevRec(e0, e1, allVars, sharesSubst, idx, m):
-    if idx < len(allVars):
-        var = allVars[idx]
-        for val in range(1 << var.width):
-            m[var] = Const(val, var.width)
-            res, v0, v1 = compareExpsWithExevRec(e0, e1, allVars, sharesSubst, idx + 1, m)
-            if res != None:
-                return res, v0, v1
-            m[var] = None
-        return None, None, None
-    else:
-        for s in sharesSubst:
-            m[s] = getExevRec(sharesSubst[s], m)
-        v0 = getExevRec(e0, m)
-        v1 = getExevRec(e1, m)
-        if v0.cst == v1.cst and v0.width == v1.width:
-            return None, None, None
-        else:
-            return dict(m), v0.cst, v1.cst
-
-
 def getVarsList(*exps):
     allVars = set()
     sharesSubst = {}
@@ -156,6 +56,110 @@ def getVarsList(*exps):
  
 
 
+def getExpValue(node, m):
+    return getExpValueRec(node, m, {})
+
+
+def getExpValueRec(node, m, expCache):
+    if isinstance(node, SymbNode):
+        if node in m:
+            return m[node]
+        if '#' in node.symb:
+            import re
+            n, b = re.split(r'#', node.symb)
+            node = Node.symb2node[n]
+            bit = int(b)
+            if node in m:
+                return Extract(bit, bit, m[node])
+        print('*** Error: Value for symbol %s not specified' % node.symb)
+        sys.exit(1)
+
+    if isinstance(node, ConstNode):
+        return node
+
+    if isinstance(node, StrNode):
+        return node
+
+    if node in expCache:
+        return expCache[node]
+
+    newChildren = []
+    op = node.op
+    for child in node.children:
+        newChildren.append(getExpValue(child, m))
+ 
+    for child in newChildren:
+        assert(isinstance(child, ConstNode) or isinstance(child, StrNode))
+
+    if op == 'E':
+        res = Extract(*newChildren)
+    elif op == 'ZE':
+        res = ZeroExt(*newChildren)
+    elif op == 'SE':
+        res = SignExt(*newChildren)
+    elif op == 'C':
+        res = Concat(*newChildren[::-1])
+    elif op == 'LS':
+        res = LShR(*newChildren)
+    elif op == '>>':
+        res = newChildren[0] >> newChildren[1]
+    elif op == '<<':
+        res = newChildren[0] << newChildren[1]
+    elif op == '-':
+        res = -newChildren[0]
+    elif op == 'A':
+        if ArrayExp.allArrays[newChildren[0].strn].content == None:
+            print('*** Error: concrete evaluation of an array access is only possible with an initialized content' % node.symb)
+            sys.exit(1)
+        res = Const(ArrayExp.allArrays[newChildren[0].strn].content[newChildren[1].cst], ArrayExp.allArrays[newChildren[0].strn].outWidth)
+    else:
+        if op == '&':
+            res = ~0
+        else:
+            res = 0
+        for child in newChildren:
+            if op == '^':
+                res = res ^ child.cst
+            elif op == '&':
+                res = res & child.cst
+            elif op == '|':
+                res = res | child.cst
+            elif op == '~':
+                res = (1 << node.width) - 1 - child.cst
+            elif op == '+':
+                res = (res + child.cst) % (1 << node.width)
+            else:
+                assert(False)
+        res = Const(res, node.width)
+
+    expCache[node] = res
+    return res
+
+
+
+
+def compareExpsWithExevRec(e0, e1, allVars, sharesSubst, idx, m):
+    if idx < len(allVars):
+        var = allVars[idx]
+        for val in range(1 << var.width):
+            m[var] = Const(val, var.width)
+            res, v0, v1 = compareExpsWithExevRec(e0, e1, allVars, sharesSubst, idx + 1, m)
+            if res != None:
+                return res, v0, v1
+            m[var] = None
+        return None, None, None
+    else:
+        for s in sharesSubst:
+            m[s] = getExpValue(sharesSubst[s], m)
+        v0 = getExpValue(e0, m)
+        v1 = getExpValue(e1, m)
+        if v0.cst == v1.cst and v0.width == v1.width:
+            return None, None, None
+        else:
+            return dict(m), v0.cst, v1.cst
+
+
+
 def compareExpsWithExev(e0, e1):
     allVarsList, sharesSubst = getVarsList(e0, e1)
     return compareExpsWithExevRec(e0, e1, allVarsList, sharesSubst, 0, {})
@@ -172,10 +176,10 @@ def compareExpsWithRandev(e0, e1, nbEval):
         for v in allVarsList:
             m[v] = Const(random.randrange(0, (1 << v.width)), v.width)
         for s in sharesSubst:
-            m[s] = getExevRec(sharesSubst[s], m)
+            m[s] = getExpValue(sharesSubst[s], m)
 
-        v0 = getExevRec(e0, m)
-        v1 = getExevRec(e1, m)
+        v0 = getExpValue(e0, m)
+        v1 = getExpValue(e1, m)
         if v0.cst != v1.cst or v0.width != v1.width:
             return m, v0, v1
     return None, None, None
@@ -190,7 +194,7 @@ def getDistribRefBis(e0, distribRef, nonSecretVars, idx, m):
             m[var] = Const(val, var.width)
             getDistribRefBis(e0, distribRef, nonSecretVars, idx + 1, m)
     else:
-        v = getExevRec(e0, m).cst
+        v = getExpValue(e0, m).cst
         distribRef[v] += 1
 
 
@@ -213,7 +217,7 @@ def getDistribWithExevRecBis(e0, distrib, distribRef, nonSecretVars, idx, m):
             m[var] = Const(val, var.width)
             getDistribWithExevRecBis(e0, distrib, distribRef, nonSecretVars, idx + 1, m)
     else:
-        v = getExevRec(e0, m).cst
+        v = getExpValue(e0, m).cst
         distrib[v] += 1
 
 
