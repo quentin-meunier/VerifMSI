@@ -11,7 +11,6 @@ from .check_leakage import *
 
 class HWElement(object):
     
-    allHWElements = []
     nodeNum = 0
     nbNIcalls = 0
     remSingleInputProbesOpt = True
@@ -21,7 +20,6 @@ class HWElement(object):
     def __init__(self):
         self.num = HWElement.nodeNum
         HWElement.nodeNum += 1
-        HWElement.allHWElements.append(self)
 
 
     @staticmethod

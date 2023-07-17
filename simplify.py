@@ -109,28 +109,52 @@ def defaultNode(node, op, newChildren, modified):
         return node
 
 
+def getBitDecompositionVarSingleBit(node, bit):
+    extractNode = Extract(bit, bit, node)
+    if extractNode.simpEqUsbv != None: 
+        #print('# SimpEqUsbv bit %d \'%s\' is: %s' % (bit, node, extractNode.simpEqUsbv))
+        return extractNode.simpEqUsbv
+    
+    #print('# Calling SymbInternal for node %s bit %d' % (node, bit))
+    s = node.symb + "#" + str(bit)
+    if node.symbType == 'A':
+        res = SymbInternal(s, 'A', 1, node.nbShares, getBitDecompositionVar(node.origSecret, bit, bit), simplifyCore(Extract(bit, bit, node.pseudoShareEq), True, True))
+    else:
+        res = SymbInternal(s, node.symbType, 1)
 
-def getBitDecompositionVar(node, msb = None, lsb = None):
-    if lsb == None:
-        lsb = 0
-    if msb == None:
+    #print('# Setting simpEqUsbv bit %d of node \'%s\' to: %s' % (bit, node, res))
+    extractNode.simpEqUsbv = res
+    return res
+
+
+def getBitDecompositionVar(node, msbIn = None, lsbIn = None):
+    assert(isinstance(node, SymbNode))
+    if node.concatExtEq != None:
+        #print('# Concat ext eq of \'%s\': %s' % (node, node.concatExtEq))
+        return node.concatExtEq
+
+    if msbIn == None or lsbIn == None:
         msb = node.width - 1
-
+        lsb = 0
+    else:
+        msb = msbIn
+        lsb = lsbIn
+    
     if node.width == 1:
         assert(msb == 0 and lsb == 0)
         return node
-    if msb == lsb:
-        s = node.symb + '#%d' % lsb
-        if node.symbType == 'A':
-            return SymbInternal(s, 'A', 1, node.nbShares, node.origSecret, getBitDecompositionVar(node.origSecret, lsb, lsb))
-        else:
-            return SymbInternal(s, node.symbType, 1)
+
     # If several bits, concat the single bits
     newChildren0 = []
     for i in range(msb, lsb - 1, -1):
-        symb = getBitDecompositionVar(node, i, i)
+        symb = getBitDecompositionVarSingleBit(node, i)
         newChildren0.append(symb)
-    return Concat(*newChildren0)
+    res = Concat(*newChildren0)
+
+    if msbIn == None or lsbIn == None:
+        node.concatExtEq = res
+
+    return res
 
 
 

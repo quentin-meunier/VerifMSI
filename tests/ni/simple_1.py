@@ -18,7 +18,7 @@ e = e | (a0 & b1)
 res = checkNIVal(e, 2)
 
 # True expected
-if res:
+if res[0]:
     print('OK')
 else:
     print('KO')
@@ -30,7 +30,7 @@ g = Concat(e, f)
 res = checkNIVal(g, 2)
 
 # True expected
-if res:
+if res[0]:
     print('OK')
 else:
     print('KO')
