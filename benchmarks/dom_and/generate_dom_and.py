@@ -236,7 +236,7 @@ import sys
     
     content += '\n'
     content += '    if checkFunctionality:\n'
-    content += '        res, v0, v1 = compareExpsWithExev(' + ' ^ '.join(['%s%d.symbExp' % (outputVar, i) for i in range(nbShares)]) + ', %s & %s)\n' % (inputVars[0], inputVars[1])
+    content += '        res, v0, v1 = compareExpsWithExev(' + ' ^ '.join(['%s%d.getSymbExp()' % (outputVar, i) for i in range(nbShares)]) + ', %s & %s)\n' % (inputVars[0], inputVars[1])
     content += '        if res == None:\n'
     content += '            print(\'# functionality (exhaustive evaluation): [OK]\')\n'
     content += '        else:\n'

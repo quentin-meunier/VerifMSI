@@ -113,7 +113,7 @@ def trichina_and_v2(*argv):
     
     
     if checkFunctionality:
-        res, v0, v1 = compareExpsWithExev(s0.symbExp ^ s1.symbExp, a & b)
+        res, v0, v1 = compareExpsWithExev(s0.getSymbExp() ^ s1.getSymbExp(), a & b)
         if res == None:
             print('# functionality (exhaustive evaluation): [OK]')
         else:

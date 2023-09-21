@@ -88,6 +88,11 @@ class Gate(HWElement):
             for i in range(len(inputs)):
                 self.leakageOut.update(inputs[i].leakageOut)
 
+
+    def getSymbExp(self):
+        return self.symbExp
+
+
     def __str__(self):
         s = ''
         s += 'Gate %s (%d)\n' % (self.op, self.num)
@@ -148,7 +153,7 @@ def dumpCircuit(filename, *outputs):
     HWElement.dumpCircuitGates(filename, reachableGates)
 
 
-def checkSecurity(order, withGlitches, secProp, *outputs):
+def checkSecurity(order, withGlitches, secProp, *outputList):
     print('# Checking Security at order %d (%s, %s property)' % (order, withGlitches and 'with glitches' or 'no glitches', secProp))
 
     def tupleEnum(gateList, order, includePartialTuples):
@@ -180,6 +185,16 @@ def checkSecurity(order, withGlitches, secProp, *outputs):
 
         tupleEnumRec(0, 0, includePartialTuples)
         return tuples
+
+    outputs = list()
+    for elem in outputList:
+        if isinstance(elem, list):
+            for gate in elem:
+                assert(isinstance(gate, HWElement))
+                outputs.append(gate)
+        else:
+            assert(isinstance(elem, HWElement))
+            outputs.append(elem)
 
 
     reachableGates = set()
@@ -439,19 +454,32 @@ def checkSecurity(order, withGlitches, secProp, *outputs):
                         nbOutputProbes += 1
                 res = checkNIVal(Concat(*t[0]), len(t[1]) - nbOutputProbes)
             elif secProp == 'pini':
-                nbOutputProbes = 0
                 outputIndexes = set()
+                nbOutputs = 0
                 for probe in t[1]:
-                    for i in range(len(outputs)):
-                        if probe is outputs[i]:
-                            outputIndexes.add(i)
-                res = checkPINIVal(Concat(*t[0]), (len(t[1]) - len(outputIndexes), outputIndexes))
+                    if isinstance(outputList[0], list):
+                        # Several outputs, each one has its shares in a list, and this share list is an element of outputList
+                        for i in range(len(outputList)):
+                            for j in range(len(outputList[i])):
+                                if probe is outputList[i][j]:
+                                    nbOutputs += 1
+                                    outputIndexes.add(j)
+
+                    else:
+                        # Only one output, the index of the share is the index in the list
+                        for i in range(len(outputs)):
+                            if probe is outputs[i]:
+                                nbOutputs += 1
+                                outputIndexes.add(i)
+
+                res = checkPINIVal(Concat(*t[0]), (len(t[1]) - nbOutputs, outputIndexes))
             else:
                 assert(False)
 
             if not res[0]:
                 #print('# Leaking expression for component(s) (%s): %s' % (', '.join(map(lambda x: '%d' % x.num, t[1])), ', '.join(map(lambda x: '%s' % x, t[0]))))
                 leakingHwe.append(t)
+
 
         if len(leakingHwe) != 0:
             print('# Following Components\' outputs are not %s secure at order %d %s glitches:' % (secProp, order, withGlitches and 'with' or 'without'))

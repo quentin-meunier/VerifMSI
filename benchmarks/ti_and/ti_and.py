@@ -113,7 +113,7 @@ def ti_and(*argv):
     
      
     if checkFunctionality:
-        res, v0, v1 = compareExpsWithExev(z0.symbExp ^ z1.symbExp ^ z2.symbExp, x & y)
+        res, v0, v1 = compareExpsWithExev(z0.getSymbExp() ^ z1.getSymbExp() ^ z2.getSymbExp(), x & y)
         if res == None:
             print('# functionality (exhaustive evaluation): [OK]')
         else:

@@ -129,9 +129,6 @@ def getBitDecompositionVarSingleBit(node, bit):
 
 def getBitDecompositionVar(node, msbIn = None, lsbIn = None):
     assert(isinstance(node, SymbNode))
-    if node.concatExtEq != None:
-        #print('# Concat ext eq of \'%s\': %s' % (node, node.concatExtEq))
-        return node.concatExtEq
 
     if msbIn == None or lsbIn == None:
         msb = node.width - 1
@@ -144,6 +141,9 @@ def getBitDecompositionVar(node, msbIn = None, lsbIn = None):
         assert(msb == 0 and lsb == 0)
         return node
 
+    if node.concatExtEq != None and lsb == 0 and msb == node.width - 1:
+        return node.concatExtEq
+
     # If several bits, concat the single bits
     newChildren0 = []
     for i in range(msb, lsb - 1, -1):
@@ -151,7 +151,7 @@ def getBitDecompositionVar(node, msbIn = None, lsbIn = None):
         newChildren0.append(symb)
     res = Concat(*newChildren0)
 
-    if msbIn == None or lsbIn == None:
+    if lsb == 0 and msb == node.width - 1:
         node.concatExtEq = res
 
     return res
@@ -159,6 +159,7 @@ def getBitDecompositionVar(node, msbIn = None, lsbIn = None):
 
 
 def getBitDecomposition(node):
+    #print('# getBitDecomposition, node = %s' % node)
     if isinstance(node, ConstNode):
         return node
 
@@ -321,6 +322,7 @@ def simplifyAndNotPEI(node):
 def simplifyCore(node, propagateExtractInwards, useSingleBitVariables):
     # Verify that using single-bit variables implies propagating Extract inwards
     assert(not useSingleBitVariables or propagateExtractInwards)
+    #print('# Simplifying node %s' % node)
 
     def setSimpEqAndReturn(node, simpEq):
         #from concrev import compareExpsWithRandev
@@ -341,8 +343,7 @@ def simplifyCore(node, propagateExtractInwards, useSingleBitVariables):
             simpEq.simpEq = simpEq
         #print('# Simplify of :')
         #print('%s' % node)
-        #print('# Returns:')
-        #print('%s' % simpEq)
+        #print('# Returns: %s' % simpEq)
         #assert(node.width == simpEq.width)
         return simpEq
 
@@ -364,8 +365,6 @@ def simplifyCore(node, propagateExtractInwards, useSingleBitVariables):
             return setSimpEqAndReturn(node, s)
         else:
             return setSimpEqAndReturn(node, node)
-
-    #print('# Simplifying node %s' % node)
 
     # After the "pre" recursive call part, the node to simplify is
     # defined with variable 'op' and list of children 'newChildren'

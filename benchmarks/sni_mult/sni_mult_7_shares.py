@@ -297,7 +297,7 @@ def sni_mult_7_shares(*argv):
     c6 = xorGate(c6, r25)
  
     if checkFunctionality:
-        res, v0, v1 = compareExpsWithRandev(c0.symbExp ^ c1.symbExp ^ c2.symbExp ^ c3.symbExp ^ c4.symbExp ^ c5.symbExp ^ c6.symbExp, a & b, 100000)
+        res, v0, v1 = compareExpsWithRandev(c0.getSymbExp() ^ c1.getSymbExp() ^ c2.getSymbExp() ^ c3.getSymbExp() ^ c4.getSymbExp() ^ c5.getSymbExp() ^ c6.getSymbExp(), a & b, 100000)
         if res == None:
             print('# functionality (random evaluation): [OK]')
         else:

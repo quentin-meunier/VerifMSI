@@ -131,7 +131,7 @@ def gms_and_3_shares(*argv):
      
      
     if checkFunctionality:
-        res, v0, v1 = compareExpsWithExev(c0.symbExp ^ c1.symbExp ^ c2.symbExp, a & b)
+        res, v0, v1 = compareExpsWithExev(c0.getSymbExp() ^ c1.getSymbExp() ^ c2.getSymbExp(), a & b)
         if res == None:
             print('# functionality (exhaustive evaluation): [OK]')
         else:
