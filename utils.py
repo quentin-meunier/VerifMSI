@@ -182,7 +182,7 @@ def getRealShares(s, nbShares):
     pseudoShares = getPseudoSharesInternal(s, nbShares)
     res = []
     for i in range(nbShares):
-        a = SymbInternal(s.symb + '[%d]' % i, 'A', s.width, nbShares, s, pseudoShares[i])
+        a = SymbInternal(s.symb + '[%d]' % i, 'A', s.width, nbShares, i, s, pseudoShares[i])
         res.append(a)
     return tuple(res)
 

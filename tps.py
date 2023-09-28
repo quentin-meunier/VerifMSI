@@ -120,7 +120,7 @@ def checkProperty(nodeIn, secProp, params, verbose):
             internalSharesIndices = set()
             for s in node.shareOcc:
                 for sh in node.shareOcc[s]:
-                    num = int(sh.symb[-2]) # FIXME: slow and incorrect if ten or more shares... add share num in node
+                    num = sh.shareNum
                     if num not in outputSharesIndices:
                         internalSharesIndices.add(num)
             if len(internalSharesIndices) <= maxSharesIndicesNum:

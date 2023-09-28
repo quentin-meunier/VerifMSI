@@ -33,7 +33,7 @@ def getVarsList(*exps):
         allVars.remove(s)
         shares = []
         for i in range(secretNbShares[s]):
-            # No need to specify the 3 last parameters as this call is expected to return an already existing share node
+            # No need to specify the 4 last parameters as this call is expected to return an already existing share node
             shares.append(SymbInternal(s.symb + '[%d]' % i, 'A', s.width))
 
         allShares = shares[0]

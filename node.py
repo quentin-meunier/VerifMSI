@@ -361,13 +361,14 @@ class FinalNode(Node):
 
 
 class SymbNode(FinalNode):
-    def __init__(self, symb, symbType, width, nbShares, origSecret, pseudoShareEq):
+    def __init__(self, symb, symbType, width, nbShares, shareNum, origSecret, pseudoShareEq):
         assert(symbType != 'A' or nbShares != None)
         assert(symbType != 'A' or origSecret != None)
         assert(symbType != 'A' or pseudoShareEq != None)
         self.symb = symb
         self.symbType = symbType
         self.nbShares = nbShares
+        self.shareNum = shareNum
         self.origSecret = origSecret
         self.pseudoShareEq = pseudoShareEq
         self.op = None
@@ -662,7 +663,7 @@ class OpNode(Node):
         return self.expPrint(False, False)
 
 
-def Symb(symb, symbType, width, nbShares = None, origSecret = None, pseudoShareEq = None):
+def Symb(symb, symbType, width, nbShares = None, shareNum = None, origSecret = None, pseudoShareEq = None):
     for ch in Node.forbiddenChars:
         if ch in symb:
             print('*** Error: symbol name (%s) cannot contain the \'%s\' character' % (symb, ch))
@@ -670,15 +671,15 @@ def Symb(symb, symbType, width, nbShares = None, origSecret = None, pseudoShareE
     if symb in Node.symb2node:
         print('*** Error: symbol %s has already been defined' % symb)
         sys.exit(1)
-    return SymbInternal(symb, symbType, width, nbShares, origSecret, pseudoShareEq)
+    return SymbInternal(symb, symbType, width, nbShares, shareNum, origSecret, pseudoShareEq)
 
 
-def SymbInternal(symb, symbType, width, nbShares = None, origSecret = None, pseudoShareEq = None):
+def SymbInternal(symb, symbType, width, nbShares = None, shareNum = None, origSecret = None, pseudoShareEq = None):
     # FIXME: check width?
     if symb in Node.symb2node:
         return Node.symb2node[symb]
     else:
-        n = SymbNode(symb, symbType, width, nbShares, origSecret, pseudoShareEq)
+        n = SymbNode(symb, symbType, width, nbShares, shareNum, origSecret, pseudoShareEq)
         Node.symb2node[symb] = n
         return n
 

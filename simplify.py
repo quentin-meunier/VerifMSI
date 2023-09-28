@@ -118,7 +118,7 @@ def getBitDecompositionVarSingleBit(node, bit):
     #print('# Calling SymbInternal for node %s bit %d' % (node, bit))
     s = node.symb + "#" + str(bit)
     if node.symbType == 'A':
-        res = SymbInternal(s, 'A', 1, node.nbShares, getBitDecompositionVar(node.origSecret, bit, bit), simplifyCore(Extract(bit, bit, node.pseudoShareEq), True, True))
+        res = SymbInternal(s, 'A', 1, node.nbShares, node.shareNum, getBitDecompositionVar(node.origSecret, bit, bit), simplifyCore(Extract(bit, bit, node.pseudoShareEq), True, True))
     else:
         res = SymbInternal(s, node.symbType, 1)
 
