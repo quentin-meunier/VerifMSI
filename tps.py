@@ -77,8 +77,8 @@ def checkProperty(nodeIn, secProp, params, verbose):
     elif secProp == 'rni':
         diff = params # Difference between the order of verification and the n-uplet size
     elif secProp == 'pini':
-        maxShareOcc = params[0]
-        outputIndexes = params[1]
+        maxSharesIndicesNum = params[0]
+        outputSharesIndices = params[1]
 
     node = simplify(nodeIn)
 
@@ -116,18 +116,14 @@ def checkProperty(nodeIn, secProp, params, verbose):
             if isRNI:
                 return True
         elif secProp == 'pini':
-            isPINI = True
-            #print('# outputIndexes: %s' % ' '.join(map(lambda x: '%d' % x, outputIndexes)))
+            #print('# outputSharesIndices: %s' % ' '.join(map(lambda x: '%d' % x, outputSharesIndices)))
+            internalSharesIndices = set()
             for s in node.shareOcc:
-                nbOcc = 0
                 for sh in node.shareOcc[s]:
-                    num = int(sh.symb[-2]) # FIXME: slow and fails if ten or more shares... add share num in node??
-                    if num not in outputIndexes:
-                        nbOcc += 1
-                if nbOcc > maxShareOcc:
-                    isPINI = False
-                    break
-            if isPINI:
+                    num = int(sh.symb[-2]) # FIXME: slow and incorrect if ten or more shares... add share num in node
+                    if num not in outputSharesIndices:
+                        internalSharesIndices.add(num)
+            if len(internalSharesIndices) <= maxSharesIndicesNum:
                 return True
 
 

@@ -171,7 +171,7 @@ def checkSecurity(order, withGlitches, secProp, *outputList):
                     else:
                         t.add(gate.symbExp)
                 return t
-    
+ 
             if nbTaken == tupleLen:
                 tuples.add((tuple(getLeakExps(t)), tuple(t)))
                 return
@@ -186,16 +186,85 @@ def checkSecurity(order, withGlitches, secProp, *outputList):
         tupleEnumRec(0, 0, includePartialTuples)
         return tuples
 
-    outputs = list()
-    for elem in outputList:
-        if isinstance(elem, list):
-            for gate in elem:
-                assert(isinstance(gate, HWElement))
-                outputs.append(gate)
-        else:
-            assert(isinstance(elem, HWElement))
-            outputs.append(elem)
 
+    #################
+    def tupleEnumPINI(outputList, internalGatesList, order, includePartialTuples):
+
+        tuples = set()
+
+        def tupleEnumPINIOutputIndices(nbOutputIndices):
+            nbShares = len(outputList[0])
+            outputSharesTaken = [None] * nbOutputIndices
+
+            def tupleEnumPINIOutputIndicesRec(nbOutputIndices, i, nbTaken):
+                if nbTaken == nbOutputIndices:
+                    tupleEnumPINIInternal(outputSharesTaken, order - nbOutputIndices)
+                    return
+
+                for idx in range(i, nbShares):
+                    outputSharesTaken[nbTaken] = idx
+                    tupleEnumPINIOutputIndicesRec(nbOutputIndices, idx + 1, nbTaken + 1)
+
+            tupleEnumPINIOutputIndicesRec(nbOutputIndices, 0, 0)
+
+
+        def tupleEnumPINIInternal(outputSharesTaken, nbInternal):
+            
+            sharesTakenTuple = tuple(outputSharesTaken)
+            t = [None] * nbInternal
+            outputSharesList = list()
+            #print('# Output shares taken: ' + ' '.join(map(lambda x: '%d' % x, outputSharesTaken)))
+            for i in outputSharesTaken:
+                for output in outputList:
+                    outputSharesList.append(output[i])
+            
+            def tupleEnumPINIInternalRec(i, nbTaken):
+                def getLeakExps(gates):
+                    t = set()
+                    for gate in gates:
+                        if withGlitches:
+                            for leakExp in gate.leakageOut:
+                                t.add(leakExp)
+                        else:
+                            t.add(gate.symbExp)
+                    return t
+ 
+                if nbTaken == nbInternal:
+                    probeList = outputSharesList + t
+                    #print('# Adding full tuple (' + ', '.join(map(lambda x: '%d' % x.num, sorted(probeList, key = lambda x: x.num))) + ')')
+                    assert(nbTaken == order - len(sharesTakenTuple))
+                    tuples.add((tuple(getLeakExps(probeList)), tuple(probeList), nbTaken, sharesTakenTuple))
+                    return
+
+                if includePartialTuples and nbTaken > 0:
+                    probeList = outputSharesList + t[0:nbTaken]
+                    #print('# Adding partial tuple (' + ', '.join(map(lambda x: '%d' % x.num, sorted(probeList, key = lambda x: x.num))) + ')')
+                    tuples.add((tuple(getLeakExps(probeList)), tuple(probeList), nbTaken, sharesTakenTuple))
+
+                for idx in range(i, len(internalGatesList)):
+                    t[nbTaken] = internalGatesList[idx]
+                    tupleEnumPINIInternalRec(idx + 1, nbTaken + 1)
+
+            tupleEnumPINIInternalRec(0, 0)
+
+
+
+        for nbOutputIndices in range(0, order + 1):
+            tupleEnumPINIOutputIndices(nbOutputIndices)
+        
+        return tuples
+    #################
+
+
+    outputs = list()
+    if isinstance(outputList[0], HWElement):
+        outputList = [outputList]
+
+    for elem in outputList:
+        assert(isinstance(elem, list) or isinstance(elem, tuple))
+        for gate in elem:
+            assert(isinstance(gate, HWElement))
+            outputs.append(gate)
 
     reachableGates = set()
     for gate in outputs:
@@ -241,28 +310,41 @@ def checkSecurity(order, withGlitches, secProp, *outputList):
 
 
         # Remove the gate / probe if it contains at most one share per input and no random
-        # or has exactly the same masking randoms and the same or a subset of the input shares of another gate
         doRemSingleInputProbesOpt = HWElement.remSingleInputProbesOpt and allInputShares
         if doRemSingleInputProbesOpt:
-            print('# Removing Probes with at most 1 share / input and no random')
+            if secProp == 'pini':
+                print('# Removing single input probes')
 
-            for g in sorted(reachableGates, key = lambda x: x.num):
-                verifyGate = True
-                moreThanOneOcc = False
-                for secret in g.symbExp.shareOcc:
-                    if len(g.symbExp.shareOcc[secret]) > 1:
-                        moreThanOneOcc = True
-                        break
-                if not moreThanOneOcc:
-                    if len(g.symbExp.maskingMaskOcc.keys()) + len(g.symbExp.otherMaskOcc.keys()) == 0:
-                        verifyGate = False
+                for g in sorted(reachableGates, key = lambda x: x.num):
+                    verifyGate = True
+                    moreThanOneOcc = False
+                    if len(g.symbExp.shareOcc) == 1:
+                        for secret in g.symbExp.shareOcc: # single secret, single iteration
+                            if len(g.symbExp.shareOcc[secret]) == 1 and len(g.symbExp.maskingMaskOcc.keys()) + len(g.symbExp.otherMaskOcc.keys()) == 0:
+                                print('# Removing gate %d: %s' % (g.num, g.symbExp))
+                                reducedGates.remove(g)
+                                withdrawnGates.add(g)
+            else:
+                print('# Removing Probes with at most 1 share / input and no random')
 
-                if not verifyGate:
-                    print('# Removing gate %d: %s' % (g.num, g.symbExp))
-                    reducedGates.remove(g)
-                    withdrawnGates.add(g)
+                for g in sorted(reachableGates, key = lambda x: x.num):
+                    verifyGate = True
+                    moreThanOneOcc = False
+                    for secret in g.symbExp.shareOcc:
+                        if len(g.symbExp.shareOcc[secret]) > 1:
+                            moreThanOneOcc = True
+                            break
+                    if not moreThanOneOcc:
+                        if len(g.symbExp.maskingMaskOcc.keys()) + len(g.symbExp.otherMaskOcc.keys()) == 0:
+                            verifyGate = False
+    
+                    if not verifyGate:
+                        print('# Removing gate %d: %s' % (g.num, g.symbExp))
+                        reducedGates.remove(g)
+                        withdrawnGates.add(g)
             
 
+        # Remove the gate / probe if it has exactly the same masking randoms and the same or a subset of the input shares of another gate
         doRemRedundantProbesOpt = HWElement.remRedundantProbesOpt
         if doRemRedundantProbesOpt:
             print('# Removing Redundant Probes')
@@ -431,7 +513,12 @@ def checkSecurity(order, withGlitches, secProp, *outputList):
     else:
 
         print('# Starting tuple enumeration')
-        tuples = tupleEnum(gates, order, doRemSingleInputProbesOpt)
+        if secProp == 'pini':
+            internalGates = list(set(gates) - set(outputs))
+            #print('# Internal gates: ' + ', '.join(map(lambda x: '%d' % x.num, sorted(internalGates, key = lambda x: x.num))))
+            tuples = tupleEnumPINI(outputList, internalGates, order, doRemSingleInputProbesOpt)
+        else:
+            tuples = tupleEnum(gates, order, doRemSingleInputProbesOpt)
         print('# Number of tuples: %d' % len(tuples))
         #for t in tuples:
         #    print('# (' + ', '.join(map(lambda x: '%d' % x.num, sorted(t[1], key = lambda x: x.num))) + ')')
@@ -454,25 +541,7 @@ def checkSecurity(order, withGlitches, secProp, *outputList):
                         nbOutputProbes += 1
                 res = checkNIVal(Concat(*t[0]), len(t[1]) - nbOutputProbes)
             elif secProp == 'pini':
-                outputIndexes = set()
-                nbOutputs = 0
-                for probe in t[1]:
-                    if isinstance(outputList[0], list):
-                        # Several outputs, each one has its shares in a list, and this share list is an element of outputList
-                        for i in range(len(outputList)):
-                            for j in range(len(outputList[i])):
-                                if probe is outputList[i][j]:
-                                    nbOutputs += 1
-                                    outputIndexes.add(j)
-
-                    else:
-                        # Only one output, the index of the share is the index in the list
-                        for i in range(len(outputs)):
-                            if probe is outputs[i]:
-                                nbOutputs += 1
-                                outputIndexes.add(i)
-
-                res = checkPINIVal(Concat(*t[0]), (len(t[1]) - nbOutputs, outputIndexes))
+                res = checkPINIVal(Concat(*t[0]), (t[2], t[3]))
             else:
                 assert(False)
 
