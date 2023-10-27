@@ -85,6 +85,7 @@ class Node(object):
         self.otherMaskOcc = {}
         self.shareOcc = {}
         self.h = None # hash
+        self.hh = None # structural hash for simp rules
 
 
     def printVarOcc(self):
@@ -378,6 +379,7 @@ class SymbNode(FinalNode):
         self.setVarsOccurrences()
         self.simpEq = self
         self.h = hashlib.sha256(self.symb.encode('utf-8')).hexdigest()
+        self.hh = hashlib.sha256('s'.encode('utf-8')).hexdigest()
 
     def toString(self):
         return super().toString(self) + ' Symb<%d> %s [%s]' % (self.width, self.symb, self.symbType)
@@ -396,6 +398,7 @@ class ConstNode(FinalNode):
         FinalNode.__init__(self, width)
         self.simpEq = self
         self.h = hashlib.sha256(str(self.cst).encode('utf-8')).hexdigest()
+        self.hh = hashlib.sha256(str(self.cst).encode('utf-8')).hexdigest()
 
     def toString(self):
         return super().toString(self) + ' Const<%d> %d' % (self.width, self.cst)
@@ -416,6 +419,7 @@ class StrNode(FinalNode):
         FinalNode.__init__(self, 0)
         self.simpEq = self
         self.h = hashlib.sha256(s.encode('utf-8')).hexdigest()
+        self.hh = hashlib.sha256(s.encode('utf-8')).hexdigest()
 
     def toString(self):
         return super().toString(self) + ' String<%d> %s' % (self.width, self.strn)
@@ -425,7 +429,6 @@ class StrNode(FinalNode):
             return '%s' % self.strn
         else:
             return '%s' % self.strn
-
 
 
 class OpNode(Node):
@@ -599,6 +602,9 @@ class OpNode(Node):
         # if node is neither a masking node nor a preserving node, currently masking masks and preserved masks are empty
             
 
+        if op in Node.associativeOps:
+            self.children.sort(key = lambda x:x.hh)
+        self.hh = hashlib.sha256((op + ''.join(map(lambda x:x.hh, self.children))).encode('utf-8')).hexdigest()
         if op in Node.associativeOps:
             self.children.sort(key = lambda x:x.h)
         self.h = hashlib.sha256((op + ''.join(map(lambda x:x.h, self.children))).encode('utf-8')).hexdigest()

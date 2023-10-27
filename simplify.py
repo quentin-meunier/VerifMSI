@@ -6,6 +6,7 @@
 
 from .utils import *
 from .node import *
+from .simp_rules import getEquiv
 
 
 # Trying to merge current node with its children if associative and children have the same op
@@ -333,6 +334,10 @@ def simplifyCore(node, propagateExtractInwards, useSingleBitVariables):
         #    print('simplified exp: %s' % simpEq)
         #    import sys
         #    sys.exit(1)
+
+        simpRuleEquiv = getEquiv(simpEq)
+        if simpRuleEquiv != None:
+            simpEq = simpRuleEquiv
 
         if useSingleBitVariables:
             node.simpEqUsbv = simpEq

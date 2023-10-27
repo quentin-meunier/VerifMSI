@@ -147,7 +147,30 @@ simplifiedExp = simplify(e)
 print('simplifiedExp: %s' % simplifiedExp)
 ```
 
-### Bit decomposition of expressions
+### Manual Simplification Rules
+
+In case VerifMSI does not manage to simplify an expression, it is possible to specify ad-hoc rules for simplification.
+This functionality is used in the PINI Mult benchmark, for which the simplfication rules of VerifMSI cannot transform the expression `((x ^ r) & y) ^ ((constant(1, 1) ^ y) & r)` present in the scheme to `(x & y) ^ r`. This can be done manually with the `addSimpRule` function:
+```
+a = symbol('a', 'P', 1)
+b = symbol('b', 'P', 1)
+c = symbol('c', 'P', 1)
+
+x = symbol('x', 'S', 1)
+y = symbol('y', 'S', 1)
+r = symbol('r', 'M', 1)
+
+ruleSrc = simplify(((a ^ c) & b) ^ ((constant(1, 1) ^ b) & c))
+ruleDst = simplify((a & b) ^ c)
+addSimpRule(ruleSrc, ruleDst)
+
+e = ((x ^ r) & y) ^ ((constant(1, 1) ^ y) & r)
+e = simplify(e)
+print('e : %s' % e)
+```
+
+
+### Bit Decomposition of Expressions
 
 VerifMSI can decompose an expression into a concatenation of bit expressions. Although this feature is mostly used in the verification algorithm, it is possible to get the equivalent bit decomposition with the function `getBitDecomposition`. n-bit symbolic variables are decomposed in n 1-bit variables of the same type.
 ```
@@ -156,6 +179,7 @@ exp = k & constant(0x5, 4)
 bitExp = getBitDecomposition(exp)
 print('bitExp: %s' % bitExp)
 ```
+
 
 ### Arrays
 

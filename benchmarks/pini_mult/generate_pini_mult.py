@@ -7,8 +7,8 @@
 import sys
 import os
  
-nbShares = 6
-order = 5
+nbShares = 3
+order = 2
 prop = 'ni'
 withGlitches = False
 outfilePrefix = 'pini_mult_gen'
@@ -173,6 +173,17 @@ import sys
 ''' % (nbShares, nbShares, nbShares)
 
 
+    content += '''
+    # Manual Simplification Rule
+    a = symbol('a', 'P', 1)
+    b = symbol('b', 'P', 1)
+    c = symbol('c', 'P', 1)
+    ruleSrc = simplify(((a ^ c) & b) ^ ((constant(1, 1) ^ b) & c))
+    ruleDst = simplify((a & b) ^ c)
+    addSimpRule(ruleSrc, ruleDst)
+
+'''
+
     inputVars = ('x', 'y')
     outputVar = 'z'
     
@@ -227,8 +238,14 @@ import sys
         for i in range(1, k):
             content += '    r%d = xorGate(u%d, r%d_%d)\n' % (i, i, k, i)
         for i in range(1, k):
-            content += '    s%d = xorGate(andGate(%s%d, %s%d), r%d)\n' % (i, inputVars[0], i, inputVars[1], k, i)
-            content += '    t%d = xorGate(andGate(%s%d, %s%d), s%d)\n' % (i, inputVars[1], i, inputVars[0], k, i)
+            content += '    ruleSrc = ((%s%d.getSymbExp() ^ r%d.getSymbExp()) & %s%d.getSymbExp()) ^ ((constant(1, 1) ^ %s%d.getSymbExp()) & r%d.getSymbExp())\n' % (inputVars[0], i, i, inputVars[1], k, inputVars[1], k, i)
+            content += '    ruleDst = (%s%d.getSymbExp() & %s%d.getSymbExp()) ^ r%d.getSymbExp()\n' % (inputVars[0], i, inputVars[1], k, i)
+            content += '    addSimpRule(simplify(ruleSrc), simplify(ruleDst))\n'
+            content += '    s%d = xorGate(andGate(xorGate(%s%d, r%d), %s%d), andGate(xorGate(constantGate(1, 1), %s%d), r%d))\n' % (i, inputVars[0], i, i, inputVars[1], k, inputVars[1], k, i)
+            content += '    ruleSrc = ((%s%d.getSymbExp() ^ s%d.getSymbExp()) & %s%d.getSymbExp()) ^ ((constant(1, 1) ^ %s%d.getSymbExp()) & s%d.getSymbExp())\n' % (inputVars[1], i, i, inputVars[0], k, inputVars[0], k, i)
+            content += '    ruleDst = (%s%d.getSymbExp() & %s%d.getSymbExp()) ^ s%d.getSymbExp()\n' % (inputVars[1], i, inputVars[0], k, i)
+            content += '    addSimpRule(simplify(ruleSrc), simplify(ruleDst))\n'
+            content += '    t%d = xorGate(andGate(xorGate(%s%d, s%d), %s%d), andGate(xorGate(constantGate(1, 1), %s%d), s%d))\n' % (i, inputVars[1], i, i, inputVars[0], k, inputVars[0], k, i)
 
         content += '    %s%d = andGate(%s%d, %s%d)\n' % (outputVar, k, inputVars[0], k, inputVars[1], k)
         for i in range(1, k):

@@ -67,7 +67,11 @@ class Gate(HWElement):
     def __init__(self, op, *inputs):
         if op == 'I':
             if not isinstance(inputs[0], Node):
-                print('*** Error: Input Gate only takes as parameter a symbolic variable or expression' % op)
+                print('*** Error: Input Gates only take as parameter a symbolic variable or expression' % op)
+                sys.exit(1)
+        elif op == 'C':
+            if not isinstance(inputs[0], ConstNode):
+                print('*** Error: Constant Gates only take as parameter a constant expression' % op)
                 sys.exit(1)
         else:
             for inp in inputs:
@@ -77,6 +81,11 @@ class Gate(HWElement):
         HWElement.__init__(self)
         self.op = op
         if op == 'I':
+            self.inputs = list()
+            self.symbExp = inputs[0]
+            self.leakageOut = set()
+            self.leakageOut.add(inputs[0])
+        elif op == 'C':
             self.inputs = list()
             self.symbExp = inputs[0]
             self.leakageOut = set()
@@ -117,6 +126,10 @@ def xorGate(*children):
 
 def inputGate(child):
     return Gate('I', child)
+
+
+def constantGate(val, nbBits):
+    return Gate('C', constant(val, nbBits))
 
 
 class Register(HWElement):
