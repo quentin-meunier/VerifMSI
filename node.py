@@ -397,8 +397,8 @@ class ConstNode(FinalNode):
         self.wordAnalysisHasFailedOnSubExp = False
         FinalNode.__init__(self, width)
         self.simpEq = self
-        self.h = hashlib.sha256(str(self.cst).encode('utf-8')).hexdigest()
-        self.hh = hashlib.sha256(str(self.cst).encode('utf-8')).hexdigest()
+        self.h = hashlib.sha256((str(self.cst) + str(self.width)).encode('utf-8')).hexdigest()
+        self.hh = hashlib.sha256((str(self.cst) + str(self.width)).encode('utf-8')).hexdigest()
 
     def toString(self):
         return super().toString(self) + ' Const<%d> %d' % (self.width, self.cst)
