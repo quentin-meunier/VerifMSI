@@ -81,7 +81,7 @@ def generate_pini_mult(*argv):
     
     nextRandNum = 0
     def getNewRandNum():
-        global nextRandNum
+        nonlocal nextRandNum
         v = nextRandNum
         nextRandNum += 1
         return v

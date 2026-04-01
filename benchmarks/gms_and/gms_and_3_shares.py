@@ -9,7 +9,7 @@ from verif_msi import *
 import os
 
 
-order = 2
+order = 1
 prop = 'tps'
 withGlitches = False
 dumpCirc = False

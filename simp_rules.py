@@ -34,7 +34,6 @@ def getMapping(exp, orig):
     # Enumerates all possible permutations
     m = {}
     #mappingsDone = []
-    origRoot = orig
 
     def enumMappingsRec(exps, origs, childNums, taken, nbRemainingChildren):
         # exps: list of nodes in exp from bottom (current node) to root
@@ -108,17 +107,6 @@ def getMapping(exp, orig):
                         m[child] = exp.children[k]
                         #print('#       m[%s] <- %s' % (child, m[child]))
                         #print('#       (' + ', '.join(map(lambda x: 'm[%s] = %s' % (x, m[x]), m.keys())) + ')')
-                        #continueLater = False
-                        #for mappingDone in mappingsDone:
-                        #    if mappingDone == m:
-                        #        continueLater = True
-                        #        print('# Mapping Done, breaking')
-                        #        break
-                        #if continueLater:
-                        #    del m[child]
-                        #    print('#       m[%s] unset' % child)
-                        #    continue
-                        #mappingsDone.append(m.copy())
                         childrenTaken[k] = True
 
                         childNums[0] += 1

@@ -12,11 +12,11 @@ import os
 # Then we apply ISW AND on (h_0, ..., h_{n-1}) and (b_0, ..., b_{n-1}).
 # Circular refresh is defined as: h_i = (rr_i ^ rr_{i + 1 % n}) ^ ai
 
-nbShares = 4
-order = 3
+nbShares = 3
+order = 2
 prop = 'tps'
 withGlitches = False
-withAdditionalRand = False
+withAdditionalRand = True
 outfilePrefix = 'isw_and_refresh_gen'
 outfile = None
 
@@ -96,7 +96,7 @@ def generate_isw_and_refresh(*argv):
     
     nextRandNum = 0
     def getNewRandNum():
-        global nextRandNum
+        nonlocal nextRandNum
         v = nextRandNum
         nextRandNum += 1
         return v
@@ -265,6 +265,8 @@ import sys
                 content += '    %s%d = xorGate(%s%d, z%d_%d)\n' % (outputVar, i, outputVar, i, i, j)
     
     
+    inputVars[0] = 'a'
+
     content += '\n'
     content += '    if checkFunctionality:\n'
     content += '        res, v0, v1 = compareExpsWithExev(' + ' ^ '.join(['%s%d.getSymbExp()' % (outputVar, i) for i in range(nbShares)]) + ', %s & %s)\n' % (inputVars[0], inputVars[1])

@@ -201,7 +201,7 @@ def checkSecurity(order, withGlitches, secProp, *outputList):
 
 
     #################
-    def tupleEnumPINI(outputList, internalGatesList, order, includePartialTuples):
+    def tupleEnumPINI(outputList, internalGatesList, order):
 
         tuples = set()
 
@@ -248,11 +248,6 @@ def checkSecurity(order, withGlitches, secProp, *outputList):
                     assert(nbTaken == order - len(sharesTakenTuple))
                     tuples.add((tuple(getLeakExps(probeList)), tuple(probeList), nbTaken, sharesTakenTuple))
                     return
-
-                if includePartialTuples and nbTaken > 0:
-                    probeList = outputSharesList + t[0:nbTaken]
-                    #print('# Adding partial tuple (' + ', '.join(map(lambda x: '%d' % x.num, sorted(probeList, key = lambda x: x.num))) + ')')
-                    tuples.add((tuple(getLeakExps(probeList)), tuple(probeList), nbTaken, sharesTakenTuple))
 
                 for idx in range(i, len(internalGatesList)):
                     t[nbTaken] = internalGatesList[idx]
@@ -322,39 +317,22 @@ def checkSecurity(order, withGlitches, secProp, *outputList):
         withdrawnGates = set()
 
 
-        # Remove the gate / probe if it contains at most one share per input and no random
-        doRemSingleInputProbesOpt = HWElement.remSingleInputProbesOpt and allInputShares
+        # Remove the gate / probe if it contains at most one share per input and no random for ni / sni / rni
+        doRemSingleInputProbesOpt = HWElement.remSingleInputProbesOpt and allInputShares and secProp != 'pini'
         if doRemSingleInputProbesOpt:
-            if secProp == 'pini':
-                print('# Removing single input probes')
+            print('# Removing Probes with at most 1 share / input and no random')
 
-                for g in sorted(reachableGates, key = lambda x: x.num):
-                    verifyGate = True
-                    moreThanOneOcc = False
-                    if len(g.symbExp.shareOcc) == 1:
-                        for secret in g.symbExp.shareOcc: # single secret, single iteration
-                            if len(g.symbExp.shareOcc[secret]) == 1 and len(g.symbExp.maskingMaskOcc.keys()) + len(g.symbExp.otherMaskOcc.keys()) == 0:
-                                print('# Removing gate %d: %s' % (g.num, g.symbExp))
-                                reducedGates.remove(g)
-                                withdrawnGates.add(g)
-            else:
-                print('# Removing Probes with at most 1 share / input and no random')
-
-                for g in sorted(reachableGates, key = lambda x: x.num):
-                    verifyGate = True
-                    moreThanOneOcc = False
-                    for secret in g.symbExp.shareOcc:
-                        if len(g.symbExp.shareOcc[secret]) > 1:
-                            moreThanOneOcc = True
-                            break
-                    if not moreThanOneOcc:
-                        if len(g.symbExp.maskingMaskOcc.keys()) + len(g.symbExp.otherMaskOcc.keys()) == 0:
-                            verifyGate = False
-    
-                    if not verifyGate:
-                        print('# Removing gate %d: %s' % (g.num, g.symbExp))
-                        reducedGates.remove(g)
-                        withdrawnGates.add(g)
+            # QM : why sorted?
+            for g in sorted(reachableGates, key = lambda x: x.num):
+                moreThanOneOcc = False
+                for secret in g.symbExp.shareOcc:
+                    if len(g.symbExp.shareOcc[secret]) > 1:
+                        moreThanOneOcc = True
+                        break
+                if not moreThanOneOcc and len(g.symbExp.maskingMaskOcc.keys()) + len(g.symbExp.otherMaskOcc.keys()) == 0:
+                    print('# Removing gate %d: %s' % (g.num, g.symbExp))
+                    reducedGates.remove(g)
+                    withdrawnGates.add(g)
             
 
         # Remove the gate / probe if it has exactly the same masking randoms and the same or a subset of the input shares of another gate
@@ -523,52 +501,52 @@ def checkSecurity(order, withGlitches, secProp, *outputList):
             return 0, HWElement.nbNIcalls
         else:
             return 1, HWElement.nbNIcalls
+
+
+    print('# Starting tuple enumeration')
+    if secProp == 'pini':
+        internalGates = list(set(gates) - set(outputs))
+        #print('# Internal gates: ' + ', '.join(map(lambda x: '%d' % x.num, sorted(internalGates, key = lambda x: x.num))))
+        tuples = tupleEnumPINI(outputList, internalGates, order)
     else:
+        tuples = tupleEnum(gates, order, doRemSingleInputProbesOpt)
+    print('# Number of tuples: %d' % len(tuples))
+    #for t in tuples:
+    #    print('# (' + ', '.join(map(lambda x: '%d' % x.num, sorted(t[1], key = lambda x: x.num))) + ')')
 
-        print('# Starting tuple enumeration')
-        if secProp == 'pini':
-            internalGates = list(set(gates) - set(outputs))
-            #print('# Internal gates: ' + ', '.join(map(lambda x: '%d' % x.num, sorted(internalGates, key = lambda x: x.num))))
-            tuples = tupleEnumPINI(outputList, internalGates, order, doRemSingleInputProbesOpt)
+    leakingHwe = list()
+    for t in tuples:
+        #print('# Checking expression for component(s) (%s): %s' % (', '.join(map(lambda x: '%d' % x.num, t[1])), ', '.join(map(lambda x: '%s' % x, t[0]))))
+        if secProp == 'tps':
+            res = checkTpsVal(Concat(*t[0]))
+        elif secProp == 'ni':
+            #print('# checking NI for exps %s and maxShareOcc = %d' % (', '.join(map(lambda x: '%s' % x, t[0])), len(t[1])))
+            res = checkNIVal(Concat(*t[0]), len(t[1]))
+        elif secProp == 'rni':
+            #print('# checking RNI for exps %s and maxShareOcc = (nbShares - 1) - %d' % (', '.join(map(lambda x: '%s' % x, t[0])), (order - len(t[1]))))
+            res = checkRNIVal(Concat(*t[0]), (order - len(t[1])))
+        elif secProp == 'sni':
+            nbOutputProbes = 0
+            for probe in t[1]:
+                if probe in outputs:
+                    nbOutputProbes += 1
+            res = checkNIVal(Concat(*t[0]), len(t[1]) - nbOutputProbes)
+        elif secProp == 'pini':
+            res = checkPINIVal(Concat(*t[0]), (t[2], t[3]))
         else:
-            tuples = tupleEnum(gates, order, doRemSingleInputProbesOpt)
-        print('# Number of tuples: %d' % len(tuples))
-        #for t in tuples:
-        #    print('# (' + ', '.join(map(lambda x: '%d' % x.num, sorted(t[1], key = lambda x: x.num))) + ')')
+            assert(False)
 
-        leakingHwe = list()
-        for t in tuples:
-            #print('# Checking expression for component(s) (%s): %s' % (', '.join(map(lambda x: '%d' % x.num, t[1])), ', '.join(map(lambda x: '%s' % x, t[0]))))
-            if secProp == 'tps':
-                res = checkTpsVal(Concat(*t[0]))
-            elif secProp == 'ni':
-                #print('# checking NI for exps %s and maxShareOcc = %d' % (', '.join(map(lambda x: '%s' % x, t[0])), len(t[1])))
-                res = checkNIVal(Concat(*t[0]), len(t[1]))
-            elif secProp == 'rni':
-                #print('# checking RNI for exps %s and maxShareOcc = (nbShares - 1) - %d' % (', '.join(map(lambda x: '%s' % x, t[0])), (order - len(t[1]))))
-                res = checkRNIVal(Concat(*t[0]), (order - len(t[1])))
-            elif secProp == 'sni':
-                nbOutputProbes = 0
-                for probe in t[1]:
-                    if probe in outputs:
-                        nbOutputProbes += 1
-                res = checkNIVal(Concat(*t[0]), len(t[1]) - nbOutputProbes)
-            elif secProp == 'pini':
-                res = checkPINIVal(Concat(*t[0]), (t[2], t[3]))
-            else:
-                assert(False)
-
-            if not res[0]:
-                #print('# Leaking expression for component(s) (%s): %s' % (', '.join(map(lambda x: '%d' % x.num, t[1])), ', '.join(map(lambda x: '%s' % x, t[0]))))
-                leakingHwe.append(t)
+        if not res[0]:
+            #print('# Leaking expression for component(s) (%s): %s' % (', '.join(map(lambda x: '%d' % x.num, t[1])), ', '.join(map(lambda x: '%s' % x, t[0]))))
+            leakingHwe.append(t)
 
 
-        if len(leakingHwe) != 0:
-            print('# Following Components\' outputs are not %s secure at order %d %s glitches:' % (secProp, order, withGlitches and 'with' or 'without'))
-            for hwe in leakingHwe:
-                print('# Leaking expression for component(s) (%s): %s' % (', '.join(map(lambda x: '%d' % x.num, hwe[1])), ', '.join(map(lambda x: '%s' % x, hwe[0]))))
-        else:
-            print('# Circuit is secure in the %s security model at order %d %s glitches' % (secProp, order, withGlitches and 'with' or 'without'))
+    if len(leakingHwe) != 0:
+        print('# Following Components\' outputs are not %s secure at order %d %s glitches:' % (secProp, order, withGlitches and 'with' or 'without'))
+        for hwe in leakingHwe:
+            print('# Leaking expression for component(s) (%s): %s' % (', '.join(map(lambda x: '%d' % x.num, hwe[1])), ', '.join(map(lambda x: '%s' % x, hwe[0]))))
+    else:
+        print('# Circuit is secure in the %s security model at order %d %s glitches' % (secProp, order, withGlitches and 'with' or 'without'))
 
     return len(leakingHwe), len(tuples)
 

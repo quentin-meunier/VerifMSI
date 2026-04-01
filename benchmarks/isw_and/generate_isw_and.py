@@ -11,7 +11,7 @@ nbShares = 3
 order = 2
 prop = 'ni'
 withGlitches = False
-withAdditionalRand = False
+withAdditionalRand = True
 outfilePrefix = 'isw_and_gen'
 outfile = None
 
@@ -88,7 +88,7 @@ def generate_isw_and(*argv):
 
     nextRandNum = 0
     def getNewRandNum():
-        global nextRandNum
+        nonlocal nextRandNum
         v = nextRandNum
         nextRandNum += 1
         return v
