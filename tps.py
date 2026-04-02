@@ -68,6 +68,33 @@ def pini(nodeIn, params, verbose = False):
     return checkProperty(nodeIn, 'pini', params, verbose)
 
 
+def opini(nodeIn, params, verbose = False):
+    if len(nodeIn.secretVarOcc) != 0:
+        print('*** Error: OPINI verification should use a share representation and not explicit secret variables')
+        sys.exit(1)
+
+    additionalInputIndexes = set()
+    probesLeakagesWithNewOutputs = []
+    probesLeakagesWithNewOutputs.append(nodeIn)
+    maxShareOcc = params[0]
+    outputIndexes = set(params[1])
+    allOutputLeakages = params[2]
+    while True:
+        res = checkProperty(Concat(*probesLeakagesWithNewOutputs), 'opini', (maxShareOcc, outputIndexes, additionalInputIndexes), verbose)
+        if not res:
+            return False
+        elif len(additionalInputIndexes) == 0:
+            return True
+        maxShareOcc = maxShareOcc - len(additionalInputIndexes)
+        for idx in additionalInputIndexes:
+            outputIndexes.add(idx)
+            for output in allOutputLeakages:
+                probesLeakagesWithNewOutputs.append(output[idx])
+        additionalInputIndexes.clear()
+
+
+
+
 def checkProperty(nodeIn, secProp, params, verbose):
     if verbose:
         print('# Call func tps on exp %s' % nodeIn)
@@ -79,6 +106,10 @@ def checkProperty(nodeIn, secProp, params, verbose):
     elif secProp == 'pini':
         maxSharesIndicesNum = params[0]
         outputSharesIndices = params[1]
+    elif secProp == 'opini':
+        maxSharesIndicesNum = params[0]
+        outputSharesIndices = params[1]
+        additionalInputIndexes = params[2]
 
     node = simplify(nodeIn)
 
@@ -167,6 +198,21 @@ def checkProperty(nodeIn, secProp, params, verbose):
                 minMaskingOcc = nbMaskingOcc
 
         if selMask == None:
+            if secProp == 'opini':
+                internalSharesIndexes = set()
+                for s in node.shareOcc:
+                    for sh in node.shareOcc[s]:
+                        num = sh.shareNum
+                        if num not in outputSharesIndices:
+                            internalSharesIndexes.add(num)
+                if len(internalSharesIndexes) > maxSharesIndicesNum:
+                    if verbose:
+                        print('# No mask can be taken')
+                    return False
+                for num in internalSharesIndexes:
+                    additionalInputIndexes.add(num)
+                return True
+
             if verbose:
                 print('# No mask can be taken')
             return False

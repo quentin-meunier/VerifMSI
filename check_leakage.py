@@ -28,6 +28,8 @@ def checkPropVal(e, secProp, params):
                 res = rni(e, params)
             elif secProp == 'pini':
                 res = pini(e, params)
+            elif secProp == 'opini':
+                res = opini(e, params)
             if not res:
                 e.wordAnalysisHasFailedOnSubExp = True
 
@@ -42,6 +44,8 @@ def checkPropVal(e, secProp, params):
                 res = rni(be, params)
             elif secProp == 'pini':
                 res = pini(be, params)
+            elif secProp == 'opini':
+                res = opini(be, params)
     else:
         if bitExpEnable():
             be = getBitDecomposition(e)
@@ -54,6 +58,8 @@ def checkPropVal(e, secProp, params):
                 res = rni(be, params)
             elif secProp == 'pini':
                 res = pini(be, params)
+            elif secProp == 'opini':
+                res = opini(be, params)
         else:
             usedBitExp = False
             if secProp == 'tps':
@@ -64,6 +70,8 @@ def checkPropVal(e, secProp, params):
                 res = rni(e, params)
             elif secProp == 'pini':
                 res = pini(e, params)
+            elif secProp == 'opini':
+                res = opini(e, params)
 
     timerEnd = timeit.default_timer()
     time = timerEnd - timerStart
@@ -83,6 +91,8 @@ def checkRNIVal(e, diff):
 def checkPINIVal(e, params):
     return checkPropVal(e, 'pini', params)
 
+def checkOPINIVal(e, params):
+    return checkPropVal(e, 'opini', params)
 
 
 def checkPropTrans(e0, e1, secProp, params):
@@ -101,6 +111,8 @@ def checkPropTrans(e0, e1, secProp, params):
                 res = rni(e, params)
             elif secProp == 'pini':
                 res = pini(e, params)
+            elif secProp == 'opini':
+                res = opini(e, params)
             # FIXME: if only transition and no value, how to make the flag become true? check each exp independently?
             #if not res:
             #    e0.wordAnalysisHasFailedOnSubExp = True
@@ -118,6 +130,8 @@ def checkPropTrans(e0, e1, secProp, params):
                 res = rni(be, params)
             elif secProp == 'pini':
                 res = pini(be, params)
+            elif secProp == 'opini':
+                res = opini(be, params)
     else:
         if bitExpEnable():
             be = getBitDecomposition(e)
@@ -130,6 +144,8 @@ def checkPropTrans(e0, e1, secProp, params):
                 res = rni(be, params)
             elif secProp == 'pini':
                 res = pini(be, params)
+            elif secProp == 'opini':
+                res = opini(be, params)
         else:
             usedBitExp = False
             if secProp == 'tps':
@@ -140,6 +156,8 @@ def checkPropTrans(e0, e1, secProp, params):
                 res = rni(e, params)
             elif secProp == 'pini':
                 res = pini(e, params)
+            elif secProp == 'opini':
+                res = opini(e, params)
 
     tpsTimerEnd = timeit.default_timer()
     tpsTime = tpsTimerEnd - tpsTimerStart
@@ -159,6 +177,9 @@ def checkRNITrans(e0, e1, diff):
 
 def checkPINITrans(e0, e1, params):
     return checkPropTrans(e0, e1, 'pini', params)
+
+def checkOPINITrans(e0, e1, params):
+    return checkPropTrans(e0, e1, 'opini', params)
 
 
 

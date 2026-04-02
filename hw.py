@@ -21,6 +21,9 @@ class HWElement(object):
         self.num = HWElement.nodeNum
         HWElement.nodeNum += 1
 
+    def getSymbExp(self):
+        return self.symbExp
+
 
     @staticmethod
     def dumpCircuitGates(filename, hwElems):
@@ -35,6 +38,8 @@ class HWElement(object):
                     s = 'AND Gate (%d)\n/%d/' % (hwe.num, hwe.symbExp.width)
                 elif hwe.op == '^':
                     s = 'XOR Gate (%d)\n/%d/' % (hwe.num, hwe.symbExp.width)
+                elif hwe.op == '!':
+                    s = 'NOT Gate (%d)\n/%d/' % (hwe.num, hwe.symbExp.width)
                 elif hwe.op == 'I':
                     n = hwe.symbExp
                     if isinstance(n, SymbNode):
@@ -98,10 +103,6 @@ class Gate(HWElement):
                 self.leakageOut.update(inputs[i].leakageOut)
 
 
-    def getSymbExp(self):
-        return self.symbExp
-
-
     def __str__(self):
         s = ''
         s += 'Gate %s (%d)\n' % (self.op, self.num)
@@ -123,6 +124,8 @@ def orGate(*children):
 def xorGate(*children):
     return Gate('^', *children)
 
+def notGate(*children):
+    return Gate('~', *children)
 
 def inputGate(child):
     return Gate('I', child)
@@ -504,7 +507,7 @@ def checkSecurity(order, withGlitches, secProp, *outputList):
 
 
     print('# Starting tuple enumeration')
-    if secProp == 'pini':
+    if secProp == 'pini' or secProp == 'opini':
         internalGates = list(set(gates) - set(outputs))
         #print('# Internal gates: ' + ', '.join(map(lambda x: '%d' % x.num, sorted(internalGates, key = lambda x: x.num))))
         tuples = tupleEnumPINI(outputList, internalGates, order)
@@ -513,6 +516,20 @@ def checkSecurity(order, withGlitches, secProp, *outputList):
     print('# Number of tuples: %d' % len(tuples))
     #for t in tuples:
     #    print('# (' + ', '.join(map(lambda x: '%d' % x.num, sorted(t[1], key = lambda x: x.num))) + ')')
+    if secProp == 'opini':
+        allOutputLeakages = [[None] * len(outputList[0]) for i in range(len(outputList))]
+        def getLeakExpsNode(gate):
+            if withGlitches:
+                s = set()
+                for leakExp in gate.leakageOut:
+                    s.add(leakExp)
+                return Concat(*list(s))
+            else:
+                return gate.symbExp
+        for outputIdx in range(len(outputList)):
+            for outputShareIdx in range(len(outputList[outputIdx])):
+                allOutputLeakages[outputIdx][outputShareIdx] = getLeakExpsNode(outputList[outputIdx][outputShareIdx])
+
 
     leakingHwe = list()
     for t in tuples:
@@ -533,6 +550,8 @@ def checkSecurity(order, withGlitches, secProp, *outputList):
             res = checkNIVal(Concat(*t[0]), len(t[1]) - nbOutputProbes)
         elif secProp == 'pini':
             res = checkPINIVal(Concat(*t[0]), (t[2], t[3]))
+        elif secProp == 'opini':
+            res = checkOPINIVal(Concat(*t[0]), (t[2], t[3], allOutputLeakages))
         else:
             assert(False)
 
