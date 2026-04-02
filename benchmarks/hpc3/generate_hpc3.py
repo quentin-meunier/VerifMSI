@@ -8,8 +8,8 @@
 import sys
 import os
  
-nbShares = 2
-order = 1
+nbShares = 3
+order = 2
 prop = 'pini'
 withGlitches = True
 outfilePrefix = 'hpc3_gen'
@@ -17,10 +17,11 @@ outfile = None
 currentScript = os.path.basename(__file__)
 bitwidth = 1
 
+article = '[1] Knichel, David, and Amir Moradi. Low-latency hardware private circuits. Proceedings of the 2022 ACM SIGSAC Conference on Computer and Communications Security. 2022. https://eprint.iacr.org/2022/507'
 
 def usage():
     print('Usage: %s [options]' % os.path.basename(__file__))
-    print('   This script generates a VerifMSI file describing a circuit implementing the finite field multiplication following the scheme from [1].')
+    print('   This script generates a VerifMSI file describing a circuit implementing the HPC3 gadget from [1].')
     print('Options:')
     print('-f,  --outfile <file>       : Set the name of the generated output file to <file> (default: %s)' % outfile)
     print('-n,  --nb-shares <n>        : Set the number of shares in the scheme to <n> (default: %d)' % nbShares)
@@ -29,7 +30,7 @@ def usage():
     print('-g,  --with-glitches        : Consider glitch propagation throughout gates (defaut: %s)' % (withGlitches and 'Yes' or 'No'))
     print('-ng, --without-glitches     : Do not consider glitch propagation throughout gates (defaut: %s)' % (withGlitches and 'No' or 'Yes'))
     print('')
-    print('[1] Gaëtan Cassiers, François-Xavier Standaert and Corentin Verhamme (2024). Low-Latency Masked Gadgets Robust against Physical Defaults with Application to Ascon. IACR Transactions on Cryptographic Hardware and Embedded Systems, 2024(3), 603-633.')
+    print('%s' % article)
 
 
 
@@ -114,7 +115,7 @@ import sys
     
     content += '''def usage():
     print('Usage: %%s [options]' %% os.path.basename(__file__))
-    print('   This script contains a VerifMSI description of a circuit implementing the finite field multiplication following the scheme from [1] with %d shares.')
+    print('   This script contains a VerifMSI description of a circuit implementing the HPC3 gadget from [1] with %d shares.')
     print('   This file was generated using the script %s')
     print('Options:')
     print('-o,  --order <n>            : Set the order of the verification to (default: %%d)' %% order)
@@ -124,7 +125,7 @@ import sys
     print('-d, --dump-circuit          : Dump the circuit in dot format in a file named \\\'%%s\\\' (default: %%r)' %% (circuitFilename, dumpCircuit))
     print('-c, --check-functionality   : Check the circuit functionality via exhaustive evaluation (default: %%r)' %% checkFunctionality)
     print('')
-    print('[1] Gaëtan Cassiers, François-Xavier Standaert and Corentin Verhamme (2024). Low-Latency Masked Gadgets Robust against Physical Defaults with Application to Ascon. IACR Transactions on Cryptographic Hardware and Embedded Systems, 2024(3), 603-633. https://tches.iacr.org/index.php/TCHES/article/view/11689/11209')
+    print('%s')
 
 
     
@@ -137,7 +138,7 @@ def getShares(s, nbShares):
 
 def hpc3_%d_shares():
 
-''' % (nbShares, currentScript, nbShares)
+''' % (nbShares, currentScript, article, nbShares)
 
 
     inputVars = ('x', 'y')
