@@ -17,6 +17,7 @@ outfile = None
 currentScript = os.path.basename(__file__)
 bitwidth = 1
 
+article = '[1] Gaëtan Cassiers and François-Xavier Standaert. 2021. Provably Secure Hardware Masking in the Transition- and Glitch-Robust Probing Model: Better Safe than Sorry. IACR Trans. Cryptogr. Hardw. Embed. Syst. 2021, 2 (2021), 136–158'
 
 def usage():
     print('Usage: %s [options]' % os.path.basename(__file__))
@@ -29,7 +30,7 @@ def usage():
     print('-g,  --with-glitches        : Consider glitch propagation throughout gates (defaut: %s)' % (withGlitches and 'Yes' or 'No'))
     print('-ng, --without-glitches     : Do not consider glitch propagation throughout gates (defaut: %s)' % (withGlitches and 'No' or 'Yes'))
     print('')
-    print('[1] Gaëtan Cassiers and François-Xavier Standaert. 2021. Provably Secure Hardware Masking in the Transition- and Glitch-Robust Probing Model: Better Safe than Sorry. IACR Trans. Cryptogr. Hardw. Embed. Syst. 2021, 2 (2021), 136–158')
+    print('%s' % article)
 
 
 
@@ -126,7 +127,7 @@ def usage():
     print('-d, --dump-circuit          : Dump the circuit in dot format in a file named \\\'%%s\\\' (default: %%r)' %% (circuitFilename, dumpCircuit))
     print('-c, --check-functionality   : Check the circuit functionality via exhaustive evaluation (default: %%r)' %% checkFunctionality)
     print('')
-    print('[1] Gaëtan Cassiers and François-Xavier Standaert. 2021. Provably Secure Hardware Masking in the Transition- and Glitch-Robust Probing Model: Better Safe than Sorry. IACR Trans. Cryptogr. Hardw. Embed. Syst. 2021, 2 (2021), 136–158')
+    print('%s')
 
 
 def getShares(s, nbShares):
@@ -134,13 +135,59 @@ def getShares(s, nbShares):
         return getPseudoShares(s, nbShares)
     else:
         return getRealShares(s, nbShares)
-
-''' % (nbShares, currentScript)
+''' % (nbShares, currentScript, article)
 
     content += '\n'
+    content += '\n'
 
-    content += '''def opini1_%d_shares():\n''' % (nbShares)
+    content += '''def opini1_%d_shares(*argv):
+    global order
+    global prop
+    global withGlitches
+    global dumpCirc
+    global checkFunctionality
+    global bitwidth
+
+    idx = 0
+    while idx < len(argv):
+        arg = argv[idx]
+        if arg == '-h' or arg == '--help':
+            usage()
+            sys.exit(0)
+        elif arg == '-o' or arg == '--order':
+            idx += 1
+            order = int(argv[idx])
+        elif arg == '-p' or arg == '--prop':
+            idx += 1
+            prop = argv[idx]
+        elif arg == '-g' or arg == '--with-glitches':
+            withGlitches = True
+        elif arg == '-ng' or arg == '--without-glitches':
+            withGlitches = False
+        elif arg == '-d' or arg == '--dump-circuit':
+            dumpCirc = True
+        elif arg == '-c' or arg == '--check-functionality':
+            checkFunctionality = True
+        else:
+            print('*** Error: unrecognized option: %%s' %% arg, file = sys.stderr)
+            usage()
+            sys.exit(1)
+        idx += 1
     
+    
+    if order >= %d:
+        print('*** Error: the order of verification (%%d) must be less than the number of shares (%d)' %% (order))
+        sys.exit(1)
+    
+    if prop != 'ni' and prop != 'sni' and prop != 'tps' and prop != 'rni' and prop != 'pini' and prop != 'opini':
+        print('*** Error: Unknown security property: %%s' %% prop)
+        print('    Valid values are: \\\'ni\\\' (Non-Interference), \\\'sni\\\' (Strong Non-Interference), \\\'rni\\\' (Relaxed Non-Interference), \\\'pini\\\' (Probing-Isolating Non-Interference), \\\'opini\\\' (Output-PINI) and \\\'tps\\\' (Treshold Probing Security)')
+        sys.exit(1)
+
+
+''' % (nbShares, nbShares, nbShares)
+
+
 
     inputVars = ('a', 'b')
     outputVar = 'c'
@@ -257,66 +304,11 @@ def getShares(s, nbShares):
     content += '    return nbLeak, nbCheck\n'
     content += '\n'
     content += '\n'
-    content += '\n'
-    content += '\n'
 
-
-    content += '''def main(*argv):
-    global order
-    global prop
-    global withGlitches
-    global dumpCirc
-    global checkFunctionality
-    global bitwidth
-
-    idx = 0
-    while idx < len(argv):
-        arg = argv[idx]
-        if arg == '-h' or arg == '--help':
-            usage()
-            sys.exit(0)
-        elif arg == '-o' or arg == '--order':
-            idx += 1
-            order = int(argv[idx])
-        elif arg == '-p' or arg == '--prop':
-            idx += 1
-            prop = argv[idx]
-        elif arg == '-g' or arg == '--with-glitches':
-            withGlitches = True
-        elif arg == '-ng' or arg == '--without-glitches':
-            withGlitches = False
-        elif arg == '-d' or arg == '--dump-circuit':
-            dumpCirc = True
-        elif arg == '-c' or arg == '--check-functionality':
-            checkFunctionality = True
-        else:
-            print('*** Error: unrecognized option: %%s' %% arg, file = sys.stderr)
-            usage()
-            sys.exit(1)
-        idx += 1
-    
-    
-    if order >= %d:
-        print('*** Error: the order of verification (%%d) must be less than the number of shares (%d)' %% (order))
-        sys.exit(1)
-    
-    if prop != 'ni' and prop != 'sni' and prop != 'tps' and prop != 'rni' and prop != 'pini' and prop != 'opini':
-        print('*** Error: Unknown security property: %%s' %% prop)
-        print('    Valid values are: \\\'ni\\\' (Non-Interference), \\\'sni\\\' (Strong Non-Interference), \\\'rni\\\' (Relaxed Non-Interference), \\\'pini\\\' (Probing-Isolating Non-Interference), \\\'opini\\\' (Output-PINI) and \\\'tps\\\' (Treshold Probing Security)')
-        sys.exit(1)
-    
-''' % (nbShares, nbShares)
-
-    
-    content += '''    nbLeak, nbCheck = opini1_%d_shares()
-    return nbLeak, nbCheck
-
-
-
-
-nbLeak, nbCheck = main()
-print('# Total Nb. of expressions analysed: %%d' %% nbCheck)
-print('# Total Nb. of potential leakages found: %%d' %% nbLeak)
+    content += '''if __name__ == '__main__':
+    nbLeak, nbCheck = opini1_%d_shares(*sys.argv[1:])
+    print('# Total Nb. of expressions analysed: %%d' %% nbCheck)
+    print('# Total Nb. of potential leakages found: %%d' %% nbLeak)
 
 ''' % (nbShares)
 

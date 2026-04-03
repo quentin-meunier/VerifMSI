@@ -17,6 +17,7 @@ outfile = None
 currentScript = os.path.basename(__file__)
 bitwidth = 1
 
+article = '[1] Knichel, David, and Amir Moradi. Low-latency hardware private circuits. Proceedings of the 2022 ACM SIGSAC Conference on Computer and Communications Security. 2022. https://eprint.iacr.org/2022/507'
 
 def usage():
     print('Usage: %s [options]' % os.path.basename(__file__))
@@ -29,7 +30,7 @@ def usage():
     print('-g,  --with-glitches        : Consider glitch propagation throughout gates (defaut: %s)' % (withGlitches and 'Yes' or 'No'))
     print('-ng, --without-glitches     : Do not consider glitch propagation throughout gates (defaut: %s)' % (withGlitches and 'No' or 'Yes'))
     print('')
-    print('[1] Gaëtan Cassiers, François-Xavier Standaert and Corentin Verhamme (2024). Low-Latency Masked Gadgets Robust against Physical Defaults with Application to Ascon. IACR Transactions on Cryptographic Hardware and Embedded Systems, 2024(3), 603-633.')
+    print('%s' % article)
 
 
 
@@ -39,6 +40,7 @@ def generate_hpc4(*argv):
     global prop
     global withGlitches
     global outfile
+    global bitwidth
 
     idx = 0
     while idx < len(argv):
@@ -109,7 +111,7 @@ import sys
     content += 'dumpCirc = False\n'
     content += 'checkFunctionality = False\n'
     content += 'circuitFilename = \'circuit.dot\'\n'
-    content += 'bitwidth = 1\n'
+    content += 'bitwidth = %d\n' % bitwidth
     content += '\n'
     
     content += '''def usage():
@@ -124,7 +126,7 @@ import sys
     print('-d, --dump-circuit          : Dump the circuit in dot format in a file named \\\'%%s\\\' (default: %%r)' %% (circuitFilename, dumpCircuit))
     print('-c, --check-functionality   : Check the circuit functionality via exhaustive evaluation (default: %%r)' %% checkFunctionality)
     print('')
-    print('[1] Gaëtan Cassiers, François-Xavier Standaert and Corentin Verhamme (2024). Low-Latency Masked Gadgets Robust against Physical Defaults with Application to Ascon. IACR Transactions on Cryptographic Hardware and Embedded Systems, 2024(3), 603-633. https://tches.iacr.org/index.php/TCHES/article/view/11689/11209')
+    print('%s')
 
 
     
@@ -133,11 +135,57 @@ def getShares(s, nbShares):
         return getPseudoShares(s, nbShares)
     else:
         return getRealShares(s, nbShares)
+''' % (nbShares, currentScript, article)
+
+    content += '\n'
+    content += '\n'
+
+    content += '''def hpc4_%d_shares(*argv):
+    global order
+    global prop
+    global withGlitches
+    global dumpCirc
+    global checkFunctionality
+    global bitwidth
+
+    idx = 0
+    while idx < len(argv):
+        arg = argv[idx]
+        if arg == '-h' or arg == '--help':
+            usage()
+            sys.exit(0)
+        elif arg == '-o' or arg == '--order':
+            idx += 1
+            order = int(argv[idx])
+        elif arg == '-p' or arg == '--prop':
+            idx += 1
+            prop = argv[idx]
+        elif arg == '-g' or arg == '--with-glitches':
+            withGlitches = True
+        elif arg == '-ng' or arg == '--without-glitches':
+            withGlitches = False
+        elif arg == '-d' or arg == '--dump-circuit':
+            dumpCirc = True
+        elif arg == '-c' or arg == '--check-functionality':
+            checkFunctionality = True
+        else:
+            print('*** Error: unrecognized option: %%s' %% arg, file = sys.stderr)
+            usage()
+            sys.exit(1)
+        idx += 1
+    
+    
+    if order >= %d:
+        print('*** Error: the order of verification (%%d) must be less than the number of shares (%d)' %% (order))
+        sys.exit(1)
+    
+    if prop != 'ni' and prop != 'sni' and prop != 'tps' and prop != 'rni' and prop != 'pini' and prop != 'opini':
+        print('*** Error: Unknown security property: %%s' %% prop)
+        print('    Valid values are: \\\'ni\\\' (Non-Interference), \\\'sni\\\' (Strong Non-Interference), \\\'rni\\\' (Relaxed Non-Interference), \\\'pini\\\' (Probing-Isolating Non-Interference), \\\'opini\\\' (Output-PINI) and \\\'tps\\\' (Treshold Probing Security)')
+        sys.exit(1)
 
 
-def hpc4_%d_shares():
-
-''' % (nbShares, currentScript, nbShares)
+''' % (nbShares, nbShares, nbShares)
 
 
     inputVars = ('x', 'y')
@@ -241,7 +289,7 @@ def hpc4_%d_shares():
     
     content += '\n'
     content += '    if checkFunctionality:\n'
-    content += '        res, v0, v1 = compareExpsWithExev(' + ' ^ '.join(['%s%d.getSymbExp()' % (outputVar, i) for i in range(0, nbShares)]) + ', %s & %s)\n' % (inputVars[0], inputVars[1])
+    content += '        res, v0, v1 = compareExpsWithExev(' + ' ^ '.join(['%s%d.getSymbExp()' % (outputVar, i) for i in range(nbShares)]) + ', %s & %s)\n' % (inputVars[0], inputVars[1])
     content += '        if res == None:\n'
     content += '            print(\'# functionality (exhaustive evaluation): [OK]\')\n'
     content += '        else:\n'
@@ -253,72 +301,17 @@ def hpc4_%d_shares():
     content += '        dumpCircuit(\'circuit.dot\', ' + ', '.join(['%s%d' % (outputVar, i) for i in range(0, nbShares)]) + ')\n'
     content += '\n'
     
-    content += '    nbLeak, nbCheck = checkSecurity(order, withGlitches, prop, ' + ', '.join(['%s%d' % (outputVar, i) for i in range(0, nbShares)]) + ')\n'
+    content += '    nbLeak, nbCheck = checkSecurity(order, withGlitches, prop, ' + ', '.join(['%s%d' % (outputVar, i) for i in range(nbShares)]) + ')\n'
     content += '    return nbLeak, nbCheck\n'
     content += '\n'
     content += '\n'
-    content += '\n'
-    content += '\n'
 
-    content += '''def main(*argv):
-    global order
-    global prop
-    global withGlitches
-    global dumpCirc
-    global checkFunctionality
-    global bitwidth
-
-    idx = 0
-    while idx < len(argv):
-        arg = argv[idx]
-        if arg == '-h' or arg == '--help':
-            usage()
-            sys.exit(0)
-        elif arg == '-o' or arg == '--order':
-            idx += 1
-            order = int(argv[idx])
-        elif arg == '-p' or arg == '--prop':
-            idx += 1
-            prop = argv[idx]
-        elif arg == '-g' or arg == '--with-glitches':
-            withGlitches = True
-        elif arg == '-ng' or arg == '--without-glitches':
-            withGlitches = False
-        elif arg == '-d' or arg == '--dump-circuit':
-            dumpCirc = True
-        elif arg == '-c' or arg == '--check-functionality':
-            checkFunctionality = True
-        else:
-            print('*** Error: unrecognized option: %%s' %% arg, file = sys.stderr)
-            usage()
-            sys.exit(1)
-        idx += 1
-    
-    
-    if order >= %d:
-        print('*** Error: the order of verification (%%d) must be less than the number of shares (%d)' %% (order))
-        sys.exit(1)
-    
-    if prop != 'ni' and prop != 'sni' and prop != 'tps' and prop != 'rni' and prop != 'pini' and prop != 'opini':
-        print('*** Error: Unknown security property: %%s' %% prop)
-        print('    Valid values are: \\\'ni\\\' (Non-Interference), \\\'sni\\\' (Strong Non-Interference), \\\'rni\\\' (Relaxed Non-Interference), \\\'pini\\\' (Probing-Isolating Non-Interference), \\\'opini\\\' (Output-PINI) and \\\'tps\\\' (Treshold Probing Security)')
-        sys.exit(1)
-    
-
-''' % (nbShares, nbShares)
-
-    content += '''    nbLeak, nbCheck = hpc4_%d_shares()
-    return nbLeak, nbCheck
-
-
-
-
-nbLeak, nbCheck = main()
-print('# Total Nb. of expressions analysed: %%d' %% nbCheck)
-print('# Total Nb. of potential leakages found: %%d' %% nbLeak)
+    content += '''if __name__ == '__main__':
+    nbLeak, nbCheck = hpc4_%d_shares(*sys.argv[1:])
+    print('# Total Nb. of expressions analysed: %%d' %% nbCheck)
+    print('# Total Nb. of potential leakages found: %%d' %% nbLeak)
 
 ''' % (nbShares)
-
 
     f = open(outfile, 'w')
     f.write(content)

@@ -18,6 +18,7 @@ checkFunctionality = False
 circuitFilename = 'circuit.dot'
 bitwidth = 1
 
+
 def usage():
     print('Usage: %s [options]' % os.path.basename(__file__))
     print('   This script contains a VerifMSI description of the OTSM gadget from [1].')
@@ -41,7 +42,50 @@ def getShares(s, nbShares):
 
 
 
-def otsm():
+def otsm(*argv):
+    global order
+    global prop
+    global withGlitches
+    global dumpCirc
+    global checkFunctionality
+    global bitwidth
+
+    idx = 0
+    while idx < len(argv):
+        arg = argv[idx]
+        if arg == '-h' or arg == '--help':
+            usage()
+            sys.exit(0)
+        elif arg == '-o' or arg == '--order':
+            idx += 1
+            order = int(argv[idx])
+        elif arg == '-p' or arg == '--prop':
+            idx += 1
+            prop = argv[idx]
+        elif arg == '-g' or arg == '--with-glitches':
+            withGlitches = True
+        elif arg == '-ng' or arg == '--without-glitches':
+            withGlitches = False
+        elif arg == '-d' or arg == '--dump-circuit':
+            dumpCirc = True
+        elif arg == '-c' or arg == '--check-functionality':
+            checkFunctionality = True
+        else:
+            print('*** Error: unrecognized option: %s' % arg, file = sys.stderr)
+            usage()
+            sys.exit(1)
+        idx += 1
+    
+    
+    if order >= 2:
+        print("*** Error: the order of verification should be 1 for this gadget")
+        sys.exit(1)
+    
+    if prop != 'ni' and prop != 'sni' and prop != 'tps' and prop != 'rni' and prop != 'pini' and prop != 'opini':
+        print('*** Error: Unknown security property: %s' % prop)
+        print('    Valid values are: \'ni\' (Non-Interference), \'sni\' (Strong Non-Interference), \'rni\' (Relaxed Non-Interference), \'pini\' (Probing-Isolating Non-Interference), \'opini\' (Output-PINI) and \'tps\' (Treshold Probing Security)')
+        sys.exit(1)
+
 
     k1 = symbol("k1", 'S', bitwidth)
     k2 = symbol("k2", 'S', bitwidth)
@@ -112,60 +156,7 @@ def otsm():
     return nbLeak, nbCheck
 
 
-
-
-def main(*argv):
-    global order
-    global prop
-    global withGlitches
-    global dumpCirc
-    global checkFunctionality
-    global bitwidth
-
-    idx = 0
-    while idx < len(argv):
-        arg = argv[idx]
-        if arg == '-h' or arg == '--help':
-            usage()
-            sys.exit(0)
-        elif arg == '-o' or arg == '--order':
-            idx += 1
-            order = int(argv[idx])
-        elif arg == '-p' or arg == '--prop':
-            idx += 1
-            prop = argv[idx]
-        elif arg == '-g' or arg == '--with-glitches':
-            withGlitches = True
-        elif arg == '-ng' or arg == '--without-glitches':
-            withGlitches = False
-        elif arg == '-d' or arg == '--dump-circuit':
-            dumpCirc = True
-        elif arg == '-c' or arg == '--check-functionality':
-            checkFunctionality = True
-        else:
-            print('*** Error: unrecognized option: %s' % arg, file = sys.stderr)
-            usage()
-            sys.exit(1)
-        idx += 1
-    
-    
-    if order >= 2:
-        print("*** Error: the order of verification should be 1 for this gadget")
-        sys.exit(1)
-    
-    if prop != 'ni' and prop != 'sni' and prop != 'tps' and prop != 'rni' and prop != 'pini' and prop != 'opini':
-        print('*** Error: Unknown security property: %s' % prop)
-        print('    Valid values are: \'ni\' (Non-Interference), \'sni\' (Strong Non-Interference), \'rni\' (Relaxed Non-Interference), \'pini\' (Probing-Isolating Non-Interference), \'opini\' (Output-PINI) and \'tps\' (Treshold Probing Security)')
-        sys.exit(1)
-    
-    nbLeak, nbCheck = otsm()
-    return nbLeak, nbCheck
-
-
-
-
-nbLeak, nbCheck = main()
-print('# Total Nb. of expressions analysed: %d' % nbCheck)
-print('# Total Nb. of potential leakages found: %d' % nbLeak)
-
-
+if __name__ == '__main__':
+    nbLeak, nbCheck = otsm(*sys.argv[1:])
+    print('# Total Nb. of expressions analysed: %d' % nbCheck)
+    print('# Total Nb. of potential leakages found: %d' % nbLeak)
