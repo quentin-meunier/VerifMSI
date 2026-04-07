@@ -85,30 +85,32 @@ def secmult():
         k0 = symbol('k0', 'S', 8)
         k1 = symbol('k1', 'S', 8)
     else:
-        m0 = constant(0xb9, 8)
+        m0 = constant(0xba, 8)
         m1 = constant(0x66, 8)
-        m01 = constant(0x37, 8)
+        m01 = constant(0x38, 8)
 
         k0 = constant(0xa1, 8)
         k1 = constant(0x0f, 8)
 
     
+    a0 = m0
+    b0 = m1
     a1 = m0 ^ k0
     b1 = m1 ^ k1
 
     # start analysis
     
-    e0 = m01 ^ gmul(m0, b1)
+    e0 = m01 ^ gmul(a0, b1)
     e0 = simplify(e0)
     checkExpLeakage(e0)
-    e1 = gmul(a1, m1)
+    e1 = gmul(a1, b0)
     e1 = simplify(e1)
     checkExpLeakage(e1)
     m10 = e0 ^ e1
     m10 = simplify(m10)
     checkExpLeakage(m10)
 
-    c0 = gmul(m0, m1)
+    c0 = gmul(a0, b0)
     c0 = simplify(c0)
     checkExpLeakage(c0)
     c0 = c0 ^ m01
@@ -125,10 +127,10 @@ def secmult():
     # end analysis
 
     if testLitteral:
-        print('c0 = 0x%x' % int(str(c0)))
-        print('c1 = 0x%x' % int(str(c1)))
-        print('c0 ^ c1 = 0x%x' % (int(str(simp(c0 ^ c1)))))
-        print('k0 * k1 = 0x%x' % (int(str(gmul(k0, k1)))))
+        print('c0 = 0x%x' % int(str(c0), 0))
+        print('c1 = 0x%x' % int(str(c1), 0))
+        print('c0 ^ c1 = 0x%x' % (int(str(simplify(c0 ^ c1)), 0)))
+        print('k0 * k1 = 0x%x' % (int(str(gmul(k0, k1)), 0)))
     
     global nbLeak, nbCheck
     return nbLeak, nbCheck
