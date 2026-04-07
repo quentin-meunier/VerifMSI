@@ -2460,9 +2460,9 @@ def getStopAddress():
     return 0x8151
 
 
-def SBoxPrime(mem, e):
-    m = mem.getSymbol('m')
-    mp = mem.getSymbol('mp')
+def SBoxPrime(e):
+    m = getSymbolByName('m')
+    mp = getSymbolByName('mp')
     assert(m != None and mp != None)
     e2 = Extract(7, 0, e)
     sbox = getArrayByName('sbox')

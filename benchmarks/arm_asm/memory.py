@@ -51,7 +51,7 @@ class Memory:
             if arr.func == None:
                 return arr[offset]
             else:
-                return arr.func(self, offset)
+                return arr.func(offset)
         addr = (base + o) % (1 << 32)
         if self.topcell.debug:
             print('# Ldr address : 0x%x' % addr)
@@ -85,7 +85,7 @@ class Memory:
             if arr.func == None:
                 return arr[offset]
             else:
-                return arr.func(self, offset)
+                return arr.func(offset)
 
         addr = (base + o) % (1 << 32)
         if self.topcell.debug:

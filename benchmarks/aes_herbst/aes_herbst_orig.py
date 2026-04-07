@@ -4,7 +4,7 @@
 # SPDX-License-Identifier: GPL-3.0-only
 # Author(s): Quentin L. Meunier
 
-from verif_msi import *
+from verif_msi_pp import *
 
 
 test_litteral = False

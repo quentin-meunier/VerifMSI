@@ -42,7 +42,7 @@ class ArrayExp(object):
         if propagateCstOnBuild() and isinstance(child, ConstNode) and self.content != None:
             return Const(self.content[child.cst], self.outWidth)
         if self.func != None:
-            return self.func(None, child)
+            return self.func(child)
         nameNode = Str(self.name)
         return OpNode('A', [nameNode, child])
 

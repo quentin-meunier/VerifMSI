@@ -13,6 +13,7 @@ registeredArraysByAddr = {}
 registeredArraysByName = {}
 registeredArrays = set()
 secretShared = set()
+symbolsByName = {}
 
 
 
@@ -152,7 +153,13 @@ def constant(val, width):
 
 
 def symbol(name, nature, width):
-    return Symb(name, nature, width)
+    s = Symb(name, nature, width)
+    symbolsByName[name] = s
+    return s
+
+
+def getSymbolByName(symb):
+    return symbolsByName[symb]
 
 
 def litteralInteger(e):
@@ -182,7 +189,9 @@ def getRealShares(s, nbShares):
     pseudoShares = getPseudoSharesInternal(s, nbShares)
     res = []
     for i in range(nbShares):
-        a = SymbInternal(s.symb + '[%d]' % i, 'A', s.width, nbShares, i, s, pseudoShares[i])
+        shareName = s.symb + '[%d]' % i
+        a = SymbInternal(shareName, 'A', s.width, nbShares, i, s, pseudoShares[i])
+        symbolsByName[shareName] = a
         res.append(a)
     return tuple(res)
 

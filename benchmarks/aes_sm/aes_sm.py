@@ -316,19 +316,18 @@ def SBox(e):
     return a[e]
 
 
-def sboxp_func(mem, e):
-    mask = memory['mask']
-    m4 = mask[4]
-    m5 = mask[5]
+def sboxp_func(e):
+    m4 = getSymbolByName('m4')
+    m5 = getSymbolByName('m5')
     sbox_t = getArrayByName('sbox')
     return sbox_t[e ^ m4] ^ m5
 
 
-def mul_02_func(mem, e):
+def mul_02_func(e):
     n = GMul(constant(2, 8), e)
     return n
 
-def mul_03_func(mem, e):
+def mul_03_func(e):
     n = GMul(constant(3, 8), e)
     return n
 
