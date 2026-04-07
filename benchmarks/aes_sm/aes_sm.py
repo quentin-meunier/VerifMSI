@@ -15,6 +15,9 @@ def sim(e):
 nbCheck = 0
 nbLeak = 0
 
+mask = {}
+
+
 def checkExpLeakage(e):
     global nbCheck
     global nbLeak
@@ -317,8 +320,8 @@ def SBox(e):
 
 
 def sboxp_func(e):
-    m4 = getSymbolByName('m4')
-    m5 = getSymbolByName('m5')
+    m4 = mask[4]
+    m5 = mask[5]
     sbox_t = getArrayByName('sbox')
     return sbox_t[e ^ m4] ^ m5
 
@@ -392,7 +395,6 @@ def aes_sm():
     registerArray('mul_02', 8, 8, None, 256, mul_02_func, mul_02)
     registerArray('mul_03', 8, 8, None, 256, mul_03_func, mul_03)
 
-    mask = {}
 
     if testLitteral:
         pt = {}

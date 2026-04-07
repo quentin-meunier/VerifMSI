@@ -115,7 +115,7 @@ def getArrayAndOffsetConcrete(addr):
 
 def checkResults(res, ref, pei = False, usbv = False):
     from .node import Node
-    from .simplify import simplifyCore, equivalence
+    from .simplify import simplify, equivalence
     assert(isinstance(res, Node))
     assert(isinstance(ref, Node))
 
@@ -124,8 +124,8 @@ def checkResults(res, ref, pei = False, usbv = False):
     if nbBits != res.width:
         print('KO (nbBits on res: %d -- expected %d)' % (res.width, nbBits))
 
-    res_s = simplifyCore(res, pei, usbv)
-    ref_s = simplifyCore(ref, pei, usbv)
+    res_s = simplify(res, pei, usbv)
+    ref_s = simplify(ref, pei, usbv)
 
     print('res : %s [%d]' % (res_s, res_s.width))
     print('ref : %s [%d]' % (ref_s, ref_s.width))

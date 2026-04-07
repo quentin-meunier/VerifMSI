@@ -191,7 +191,7 @@ def checkTpsTransBit(e0, e1):
 
         for b in range(e0.width - 1, -1, -1):
             tpsTimerStart = timeit.default_timer()
-            be = Concat(simplifyCore(Extract(b, b, e0), True, True), simplifyCore(Extract(b, b, e1), True, True))
+            be = Concat(simplify(Extract(b, b, e0), True, True), simplify(Extract(b, b, e1), True, True))
 
             resTps = tps(be)
             tpsTimerEnd = timeit.default_timer()
@@ -246,7 +246,7 @@ def checkTpsTransXorBit(e0, e1):
 
         for b in range(e0.width - 1, -1, -1):
             tpsTimerStart = timeit.default_timer()
-            be = simplifyCore(Extract(b, b, e0) ^ Extract(b, b, e1), True, True)
+            be = simplify(Extract(b, b, e0) ^ Extract(b, b, e1), True, True)
 
             resTps = tps(be)
             tpsTimerEnd = timeit.default_timer()

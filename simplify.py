@@ -119,7 +119,7 @@ def getBitDecompositionVarSingleBit(node, bit):
     #print('# Calling SymbInternal for node %s bit %d' % (node, bit))
     s = node.symb + "#" + str(bit)
     if node.symbType == 'A':
-        res = SymbInternal(s, 'A', 1, node.nbShares, node.shareNum, getBitDecompositionVar(node.origSecret, bit, bit), simplifyCore(Extract(bit, bit, node.pseudoShareEq), True, True))
+        res = SymbInternal(s, 'A', 1, node.nbShares, node.shareNum, getBitDecompositionVar(node.origSecret, bit, bit), simplify(Extract(bit, bit, node.pseudoShareEq), True, True))
     else:
         res = SymbInternal(s, node.symbType, 1)
 
@@ -194,7 +194,7 @@ def getBitDecomposition(node):
  
     l = []
     for b in range(node.width - 1, -1, -1):
-        l.append(simplifyCore(Extract(b, b, node), True, True))
+        l.append(simplify(Extract(b, b, node), True, True))
     be = Concat(*l)
     node.concatExtEq = be
     return be
@@ -312,8 +312,11 @@ def factorize(mulOp, addOp, newChildren, width):
 
 
 
-def simplify(node):
-    return simplifyCore(node, True, False)
+def simplify(node, propagateExtractInwards = True, useSingleBitVariables = False):
+    #assert(not useSingleBitVariables or propagateExtractInwards)
+    #if propagateExtractInwards and useSingleBitVariables:
+    #    return getBitDecomposition(node)
+    return simplifyCore(node, propagateExtractInwards, useSingleBitVariables)
 
 
 def simplifyAndNotPEI(node):

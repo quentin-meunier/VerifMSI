@@ -71,7 +71,8 @@ mul_03 = [
 
 
 rcon = [ 1, 2, 4, 8, 16, 32, 64, 128, 27, 54 ]
-memory = {}
+
+mask = {}
 
 def display_vector(v):
     for i in range(16):
@@ -199,8 +200,8 @@ def copy_key(masked_round_key, round_key):
 
 
 def sboxp_func(e):
-    m4 = getSymbolByName('m4')
-    m5 = getSymbolByName('m5')
+    m4 = mask[4]
+    m5 = mask[5]
     sbox_t = getArrayByName('sbox')
     return sbox_t[e ^ m4] ^ m5
 
@@ -273,8 +274,6 @@ if __name__ == '__main__':
     registerArray('mul_02', 8, 8, None, 256, mul_02_func, mul_02)
     registerArray('mul_03', 8, 8, None, 256, mul_03_func, mul_03)
 
-    mask = {}
-
     if test_litteral:
         pt = {}
         for i in range(16):
@@ -312,7 +311,6 @@ if __name__ == '__main__':
         print("Key:           ", end = '')
         display_vector(key)
     
-    memory['mask'] = mask
     ct = {}
     masked_aes(key, pt, ct, mask)
 

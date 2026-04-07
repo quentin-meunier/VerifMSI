@@ -4,10 +4,10 @@
 # SPDX-License-Identifier: GPL-3.0-only
 # Author(s): Quentin L. Meunier
 
-from verif_msi_pp import *
+from verif_msi import *
 
 
-test_litteral = False
+test_litteral = True
 
 
 sbox = [
