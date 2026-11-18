@@ -1,20 +1,17 @@
-#!/usr/bin/python
-
-from __future__ import print_function
-
+#!/usr/bin/env python3
+# This file was automatically ported from VerifMSI++
 from verif_msi import *
+import random
 
-p0 = symbol('p0', 'S', 3)
-p1 = symbol('p1', 'S', 3)
-p2 = symbol('p2', 'S', 3)
-p3 = symbol('p3', 'S', 3)
-a = ArrayExp('a', 3, 3, None, None, None, None)
+p0 = symbol("p0", 'P', 3)
+p1 = symbol("p1", 'P', 3)
+p2 = symbol("p2", 'P', 3)
+a = ArrayExp("a", 3, 3)
 
 f = p0 ^ p1 ^ p2 ^ p0
-e = a[f]
+n = a[f]
 
 res = a[p1 ^ p2]
 
-checkResults(e, res)
-
+checkResults(n, res)
 

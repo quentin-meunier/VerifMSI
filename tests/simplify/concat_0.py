@@ -1,8 +1,7 @@
-#!/usr/bin/python
-
-from __future__ import print_function
-
+#!/usr/bin/env python3
+# This file was automatically ported from VerifMSI++
 from verif_msi import *
+import random
 
 
 c0 = constant(0x78, 8)
@@ -13,10 +12,7 @@ c4 = constant(0x12345678, 32)
 n = Concat(c3, c2, c1, c0)
 
 # result is 0x12345678
-wres = c4
+res = c4
 
-checkResults(n, wres)
-
-n.dump('graph.dot')
-
+checkResults(n, res)
 

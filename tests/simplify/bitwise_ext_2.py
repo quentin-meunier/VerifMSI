@@ -1,20 +1,14 @@
-#!/usr/bin/python
-
-from __future__ import print_function
-
+#!/usr/bin/env python3
+# This file was automatically ported from VerifMSI++
 from verif_msi import *
+import random
 
-
-p = symbol('p', 'P', 8)
-m = symbol('m', 'M', 1)
+p = symbol("p", 'P', 8)
+m = symbol("m", 'M', 1)
 
 n = Extract(7, 0, ZeroExt(24, p) ^ ZeroExt(31, m))
 
-n = simplify(n)
+res = Concat(constant(0, 7), m) ^ p
 
-
-
-# FIXME: how to check the result?
-
-
+checkResults(n, res)
 

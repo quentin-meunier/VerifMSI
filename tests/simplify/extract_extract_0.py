@@ -1,17 +1,13 @@
-#!/usr/bin/python
-
-from __future__ import print_function
-
+#!/usr/bin/env python3
+# This file was automatically ported from VerifMSI++
 from verif_msi import *
+import random
 
 
-p = symbol('p', 'P', 32)
+p = symbol("p", 'P', 32)
 n = Extract(2, 1, Extract(15, 8, p))
 
-wres = Extract(10, 9, p)
+res = Extract(10, 9, p)
 
-checkResults(n, wres)
-
-n.dump('graph.dot')
-
+checkResults(n, res)
 

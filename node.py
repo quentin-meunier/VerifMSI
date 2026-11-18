@@ -15,8 +15,11 @@ import hashlib
 class ArrayExp(object):
 
     allArrays = {}
+    registeredArrays = set()
+    registeredArraysByName = {}
+    registeredArraysByAddr = {}
 
-    def __init__(self, name, inWidth, outWidth, addr, size, func, content):
+    def __init__(self, name, inWidth, outWidth, addr=0, size=0, func=None, content=None, elemSize=None):
         if not isinstance(name, str):
             print('*** Error: ArrayExp name must be a string')
             assert(False)
@@ -29,22 +32,37 @@ class ArrayExp(object):
         self.addr = addr
         self.size = size
         self.func = func
-        self.elemSize = outWidth / 8
         self.content = content
+        self.elemSize = elemSize if elemSize is not None else (outWidth // 8 if outWidth >= 8 else 1)
 
         ArrayExp.allArrays[name] = self
+        ArrayExp.registeredArrays.add(self)
+        ArrayExp.registeredArraysByName[name] = self
+        if addr != 0:
+            ArrayExp.registeredArraysByAddr[addr] = self
 
+    def getContent(self, idx):
+        if self.content is not None:
+            return self.content[idx]
+        return 0
 
     def __getitem__(self, child):
         if child.width != self.inWidth:
             print('*** Error: Expression %s has a width of %d which cannot be used to index array %s with a width of %d' % (child, child.width, self.name, self.inWidth))
             assert(False)
-        if propagateCstOnBuild() and isinstance(child, ConstNode) and self.content != None:
-            return Const(self.content[child.cst], self.outWidth)
-        if self.func != None:
+        if propagateCstOnBuild() and isinstance(child, ConstNode) and self.content is not None:
+            return Const(self.getContent(child.cst), self.outWidth)
+        if self.func is not None:
             return self.func(child)
         nameNode = Str(self.name)
         return OpNode('A', [nameNode, child])
+
+    @classmethod
+    def cleanup(cls):
+        cls.allArrays.clear()
+        cls.registeredArrays.clear()
+        cls.registeredArraysByName.clear()
+        cls.registeredArraysByAddr.clear()
 
 
 
@@ -59,11 +77,24 @@ class Node(object):
     symb2node = {}
     cst2node = {}
     str2node = {}
+    allNodes = {}
+    symbolsByName = {}
+    secretShared = set()
    
     nodeNum = 0
     gfBase = 3
     gfIrr = 0x1b
     powersTwo = [1, 2, 4, 8, 16, 32, 64, 128]
+
+    @classmethod
+    def cleanup(cls):
+        cls.symb2node.clear()
+        cls.cst2node.clear()
+        cls.str2node.clear()
+        cls.allNodes.clear()
+        cls.symbolsByName.clear()
+        cls.secretShared.clear()
+        cls.nodeNum = 0
 
     def __init__(self):
         self.children = []
@@ -76,6 +107,7 @@ class Node(object):
         self.concatExtEq = None
         self.simpEq = None # simplified equivalent node
         self.simpEqUsbv = None # simplified equivalent node using single-bit variables
+        self.hasPlus = False
 
         self.secretVarOcc = {}
         self.publicVarOcc = {}
@@ -129,7 +161,6 @@ class Node(object):
             print('#    Mask %s' % m)
             for p in self.otherMaskOcc[m]:
                 print('#        Parent: %s' % p)
-                print('#            count: %d' % self.otherMaskOcc[m][p])
 
 
 
@@ -140,7 +171,7 @@ class Node(object):
         if isinstance(self, SymbNode):
             if self.symbType == 'M':
                 self.preservedMask = (self, None) # (mask, parent)
-                self.otherMaskOcc[self] = None
+                self.otherMaskOcc[self] = set()
             elif self.symbType == 'P':
                 self.publicVarOcc[self] = 1
             elif self.symbType == 'S':
@@ -289,8 +320,11 @@ class Node(object):
     def __lshift__(self, shval):
         if isinstance(shval, ConstNode):
             shval = shval.cst
+        elif isinstance(shval, Node):
+            return OpNode('s<<', [self, shval])
+
         if not isinstance(shval, int):
-            print('*** Error: Second operand of a Shift operation can only be a constant')
+            print('*** Error: Second operand of a Shift operation can only be a constant or a Node')
             assert(False)
 
         width = self.width
@@ -309,8 +343,11 @@ class Node(object):
         # Arith Shift Right
         if isinstance(shval, ConstNode):
             shval = shval.cst
+        elif isinstance(shval, Node):
+            return OpNode('s>>', [self, shval])
+
         if not isinstance(shval, int):
-            print('*** Error: Second operand of a Shift operation can only be a constant')
+            print('*** Error: Second operand of a Shift operation can only be a constant or a Node')
             assert(False)
 
         width = self.width
@@ -380,6 +417,10 @@ class SymbNode(FinalNode):
         self.simpEq = self
         self.h = hashlib.sha256(self.symb.encode('utf-8')).hexdigest()
         self.hh = hashlib.sha256('s'.encode('utf-8')).hexdigest()
+        if 'symb' in Node.allNodes:
+            Node.allNodes['symb'] += 1
+        else:
+            Node.allNodes['symb'] = 1
 
     def toString(self):
         return super().toString(self) + ' Symb<%d> %s [%s]' % (self.width, self.symb, self.symbType)
@@ -397,8 +438,12 @@ class ConstNode(FinalNode):
         self.wordAnalysisHasFailedOnSubExp = False
         FinalNode.__init__(self, width)
         self.simpEq = self
-        self.h = hashlib.sha256((str(self.cst) + str(self.width)).encode('utf-8')).hexdigest()
-        self.hh = hashlib.sha256((str(self.cst) + str(self.width)).encode('utf-8')).hexdigest()
+        self.h = hashlib.sha256((str(self.cst) + '_' + str(self.width)).encode('utf-8')).hexdigest()
+        self.hh = hashlib.sha256((str(self.cst) + '_' + str(self.width)).encode('utf-8')).hexdigest()
+        if 'const' in Node.allNodes:
+            Node.allNodes['const'] += 1
+        else:
+            Node.allNodes['const'] = 1
 
     def toString(self):
         return super().toString(self) + ' Const<%d> %d' % (self.width, self.cst)
@@ -420,6 +465,11 @@ class StrNode(FinalNode):
         self.simpEq = self
         self.h = hashlib.sha256(s.encode('utf-8')).hexdigest()
         self.hh = hashlib.sha256(s.encode('utf-8')).hexdigest()
+        if 'str' in Node.allNodes:
+            Node.allNodes['str'] += 1
+        else:
+            Node.allNodes['str'] = 1
+
 
     def toString(self):
         return super().toString(self) + ' String<%d> %s' % (self.width, self.strn)
@@ -435,7 +485,8 @@ class OpNode(Node):
     def __init__(self, op, children):
         assert(children != None and children)
         self.op = op
-        self.hasWordOp = (op == '*' or op == '**' or op == 'M' or op == 'P' or op == 'L' or op == 'X')
+        self.hasWordOp = (op in ('*', '**', 'M', 'P', 'L', 'X', 'A', 's<<', 's>>', 'SLS') or
+                          (not bitSimplifyPlusEnable() and op == '+'))
         if not self.hasWordOp:
             for c in children:
                 if c.hasWordOp:
@@ -446,8 +497,14 @@ class OpNode(Node):
             if c.wordAnalysisHasFailedOnSubExp:
                 self.wordAnalysisHasFailedOnSubExp = True
                 break
+        self.hasPlus = (op == '+')
+        if not self.hasPlus:
+            for c in children:
+                if c.hasPlus:
+                    self.hasPlus = True
+                    break
 
-        if op == '+' or op == '--' or op == '-' or op == '&' or op == '|' or op == '^' or op == '~' or op == '<<' or op == '>>' or op == 'LS' or op == '*' or op == '**' or op == 'M' or op == 'P' or op == 'L' or op == 'X':
+        if op in ('+', '--', '-', '&', '|', '^', '~', '<<', '>>', 'LS', 's<<', 's>>', 'SLS', '*', '**', 'M', 'P', 'L', 'X'):
             self.width = children[0].width
         elif op == 'ZE' or op == 'SE':
             self.width = children[0].cst + children[1].width
@@ -463,6 +520,12 @@ class OpNode(Node):
         else:
             print("op = %s" % op)
             assert(False)
+
+        if op in Node.allNodes:
+            Node.allNodes[op] += 1
+        else:
+            Node.allNodes[op] = 1
+
 
 
         Node.__init__(self)
@@ -509,20 +572,14 @@ class OpNode(Node):
  
         # For other mask occurrences, we do the union of all the children
         for child in children:
-            for m in child.otherMaskOcc:
+            for m, nbOcc0 in child.otherMaskOcc.items():
                 if m not in self.otherMaskOcc:
-                    self.otherMaskOcc[m] = {}
-                if child.otherMaskOcc[m] == None:
-                    if self in self.otherMaskOcc[m]:
-                        self.otherMaskOcc[m][self] += 1
-                    else:
-                        self.otherMaskOcc[m][self] = 1
+                    self.otherMaskOcc[m] = set()
+                if len(nbOcc0) == 0:
+                    self.otherMaskOcc[m].add(self)
                 else:
-                    for p in child.otherMaskOcc[m]:
-                        if p in self.otherMaskOcc[m]:
-                            self.otherMaskOcc[m][p] += child.otherMaskOcc[m][p]
-                        else:
-                            self.otherMaskOcc[m][p] = child.otherMaskOcc[m][p]
+                    for p in nbOcc0:
+                        self.otherMaskOcc[m].add(p)
 
 
 
@@ -565,11 +622,10 @@ class OpNode(Node):
                         self.currentlyMasking[m] = self
 
                         # Removing mask occurrence from otherOccurrences
-                        if parent == None:
+                        if parent is None:
                             parent = self
-                        self.otherMaskOcc[m][parent] -= 1
-                        if self.otherMaskOcc[m][parent] == 0:
-                            del self.otherMaskOcc[m][parent]
+                        if m in self.otherMaskOcc:
+                            self.otherMaskOcc[m].discard(parent)
                             if len(self.otherMaskOcc[m]) == 0:
                                 del self.otherMaskOcc[m]
 
@@ -637,6 +693,19 @@ class OpNode(Node):
         elif self.op == 'LS':
             res = 'LShR(' + self.children[0].expPrint(False, verbatim) + ', ' + str(self.children[1].cst) + ')'
             return res
+        elif self.op == 'SLS':
+            res = 'SLShR(' + self.children[0].expPrint(False, verbatim) + ', ' + self.children[1].expPrint(False, verbatim) + ')'
+            return res
+        elif self.op == 's>>':
+            res = self.children[0].expPrint(False, verbatim) + ' s>> ' + self.children[1].expPrint(True, verbatim)
+            if parNeeded:
+                res = '(' + res + ')'
+            return res
+        elif self.op == 's<<':
+            res = self.children[0].expPrint(False, verbatim) + ' s<< ' + self.children[1].expPrint(True, verbatim)
+            if parNeeded:
+                res = '(' + res + ')'
+            return res
         elif (self.op == '>>' or self.op == '<<'):
             res = self.children[0].expPrint(False, verbatim) + ' ' + self.op + ' ' + str(self.children[1].cst)
             if parNeeded:
@@ -691,6 +760,7 @@ def SymbInternal(symb, symbType, width, nbShares = None, shareNum = None, origSe
 
 
 def Const(cst, width):
+
     def makeConstNode(cst, nbBits):
         if nbBits in Node.cst2node.keys():
             if cst in Node.cst2node[nbBits].keys():
@@ -735,8 +805,11 @@ def LShR(child, shval):
     
     if isinstance(shval, ConstNode):
         shval = shval.cst
+    elif isinstance(shval, Node):
+        return OpNode('SLS', [child, shval])
+
     if not isinstance(shval, int):
-        print('*** Error: Second operand of a Shift operation can only be a constant')
+        print('*** Error: Second operand of a Shift operation can only be a constant or a Node')
         assert(False)
 
     width = child.width
@@ -751,6 +824,8 @@ def LShR(child, shval):
 
     n = OpNode('LS', [child, sh])
     return n
+
+SLShR = LShR
 
 
 def RotateRight(child, shval):
@@ -770,6 +845,8 @@ def RotateRight(child, shval):
 
 
 def Concat(*children):
+    if len(children) == 1 and isinstance(children[0], (list, tuple)):
+        children = tuple(children[0])
     assert(children != None and children)
     for child in children:
         assert(isinstance(child, Node))
@@ -793,7 +870,7 @@ def Concat(*children):
             return newConstExp
 
     # Inverting list so that child 0 of node has weight 0
-    n = OpNode('C', children[::-1])
+    n = OpNode('C', list(reversed(children)))
     return n
 
 
@@ -828,6 +905,51 @@ def Extract(msb, lsb, child):
         n = Const(newCst, msb - lsb + 1)
         return n
 
+    if simplifyExtractOnBuild():
+        if lsb == 0 and msb == child.width - 1:
+            return child
+
+        if child.op == 'E':
+            gLsb = child.children[1].cst
+            gchild = child.children[2]
+            return Extract(msb + gLsb, lsb + gLsb, gchild)
+
+        if child.op == 'C':
+            concatNode = child
+            startBitIdx = lsb
+            removedBitsOnRight = 0
+            i = 0
+            while concatNode.children[i].width <= startBitIdx:
+                concatChildWidth = concatNode.children[i].width
+                startBitIdx -= concatChildWidth
+                removedBitsOnRight += concatChildWidth
+                i += 1
+
+            startChildIdx = i
+            endBitIdx = msb - removedBitsOnRight
+
+            i = startChildIdx
+            currBitIdx = concatNode.children[i].width - 1
+            while currBitIdx < endBitIdx:
+                i += 1
+                currBitIdx += concatNode.children[i].width
+            endChildIdx = i
+
+            if startChildIdx == endChildIdx:
+                if startBitIdx == 0 and endBitIdx == concatNode.children[startChildIdx].width - 1:
+                    return concatNode.children[startChildIdx]
+                else:
+                    return Extract(endBitIdx, startBitIdx, concatNode.children[startChildIdx])
+
+            if startBitIdx == 0 and endBitIdx == currBitIdx:
+                concatChildren = concatNode.children[startChildIdx:endChildIdx + 1]
+                return Concat(*reversed(concatChildren))
+
+            if startChildIdx > 0 or endChildIdx < len(concatNode.children) - 1:
+                concatChildren = concatNode.children[startChildIdx:endChildIdx + 1]
+                newConcatNode = Concat(*reversed(concatChildren))
+                return Extract(endBitIdx, startBitIdx, newConcatNode)
+
     if msb == lsb and child.extractBit[lsb] != None:
         return child.extractBit[lsb]
 
@@ -838,6 +960,23 @@ def Extract(msb, lsb, child):
         child.extractBit[lsb] = n
 
     return n
+
+
+def isZero(v, width=None):
+    if isinstance(v, ConstNode):
+        return v.cst == 0
+    if isinstance(v, int):
+        return v == 0
+    return False
+
+
+def isAllOne(v, width=None):
+    if isinstance(v, ConstNode):
+        w = width if width is not None else v.width
+        return v.cst == (1 << w) - 1
+    if isinstance(v, int) and width is not None:
+        return v == (1 << width) - 1
+    return False
 
 
 

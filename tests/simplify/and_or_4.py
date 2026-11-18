@@ -1,21 +1,15 @@
-#!/usr/bin/python
-
-from __future__ import print_function
-
+#!/usr/bin/env python3
+# This file was automatically ported from VerifMSI++
 from verif_msi import *
+import random
 
+a = symbol("a", 'P', 8)
+b = symbol("b", 'P', 8)
+c = symbol("c", 'P', 8)
+ab = a & b
 
-a = symbol('a', 'P', 8)
-b = symbol('b', 'P', 8)
-c = symbol('c', 'P', 8)
-
-
-#n0 = (a & b) | a | c
-n0 = OpNode('|', [a & b, a, c])
+n = OpNode('|', [ab, a, c])
 res = a | c
 
-checkResults(n0, res)
-
-n0.dump('graph.dot')
-
+checkResults(n, res)
 

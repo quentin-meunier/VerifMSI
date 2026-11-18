@@ -1,18 +1,13 @@
-#!/usr/bin/python
-
-from __future__ import print_function
-
+#!/usr/bin/env python3
+# This file was automatically ported from VerifMSI++
 from verif_msi import *
+import random
 
+a = symbol("a", 'P', 8)
 
-a = symbol('a', 'P', 8)
-
-
-r = GMul(GMul(a, constant(1, 8)), constant(5, 8))
+n = GMul(GMul(a, constant(1, 8)), constant(5, 8))
 
 res = GMul(a, constant(5, 8))
 
-checkResults(r, res)
-
-
+checkResults(n, res)
 

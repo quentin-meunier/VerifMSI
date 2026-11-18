@@ -1,16 +1,13 @@
-#!/usr/bin/python
-
-from __future__ import print_function
-
+#!/usr/bin/env python3
+# This file was automatically ported from VerifMSI++
 from verif_msi import *
+import random
 
 
+k = symbol("k", 'S', 8)
+n = Extract(7, 7, k >> 1)
 
-k = symbol('k', 'S', 8)
-n1 = Extract(7, 7, k >> 1)
+res = Extract(7, 7, k)
 
-r = Extract(7, 7, k)
-checkResults(n1, r)
-
-
+checkResults(n, res)
 

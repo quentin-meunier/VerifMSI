@@ -1,9 +1,7 @@
-#!/usr/bin/python
-
-from __future__ import print_function
-
+#!/usr/bin/env python3
+# This file was automatically ported from VerifMSI++
 from verif_msi import *
-
+import random
 
 sbox = [
     0x63, 0x7C, 0x77, 0x7B, 0xF2, 0x6B, 0x6F, 0xC5, 0x30, 0x01, 0x67, 0x2B, 0xFE, 0xD7, 0xAB, 0x76,
@@ -24,19 +22,19 @@ sbox = [
     0x8C, 0xA1, 0x89, 0x0D, 0xBF, 0xE6, 0x42, 0x68, 0x41, 0x99, 0x2D, 0x0F, 0xB0, 0x54, 0xBB, 0x16
 ]
 
+m = symbol("m", 'M', 8)
 
-m = symbol('m', 'M', 8)
+a = ArrayExp("sbox", 8, 8, 0x0, 256, None, sbox, 1)
 
-registerArray('sbox', 8, 8, None, 256, None, sbox)
+exp = a[m]
 
-exp = getArrayByName('sbox')[m]
 
-rud, sid = getDistribWithExev(exp)
+rud
+
+sid = getDistribWithExev(exp, rud)
+
 if rud and sid:
-    print('OK')
+    print("OK")
 else:
-    print('KO')
-
-
-
+    print("KO")
 

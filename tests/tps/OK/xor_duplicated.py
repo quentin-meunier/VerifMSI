@@ -1,12 +1,11 @@
-#!/usr/bin/python
-
-from __future__ import print_function
-
+#!/usr/bin/env python3
+# This file was automatically ported from VerifMSI++
 from verif_msi import *
+import random
 
 
-s0 = symbol('s0', 'S', 1)
-r0 = symbol('r0', 'M', 1)
+s0 = symbol("s0", 'S', 1)
+r0 = symbol("r0", 'M', 1)
 
 n0 = s0 ^ r0
 n1 = s0 ^ r0
@@ -20,7 +19,4 @@ n7 = s0 ^ r0
 e = Concat(n0, n1, n2, n3, n4, n5, n6, n7)
 
 checkTpsResult(e, True)
-
-
-
 

@@ -8,10 +8,18 @@ from .node import *
 from .simplify import *
 from .check_leakage import *
 
+TPS = 'tps'
+NI = 'ni'
+SNI = 'sni'
+RNI = 'rni'
+PINI = 'pini'
+OPINI = 'opini'
+
 
 class HWElement(object):
     
     nodeNum = 0
+    allHWElements = set()
     nbNIcalls = 0
     remSingleInputProbesOpt = True
     remRedundantProbesOpt = True
@@ -20,6 +28,13 @@ class HWElement(object):
     def __init__(self):
         self.num = HWElement.nodeNum
         HWElement.nodeNum += 1
+        HWElement.allHWElements.add(self)
+
+    @classmethod
+    def cleanup(cls):
+        cls.allHWElements.clear()
+        cls.nodeNum = 0
+        cls.nbNIcalls = 0
 
     def getSymbExp(self):
         return self.symbExp
@@ -114,18 +129,120 @@ class Gate(HWElement):
 
 
 def andGate(*children):
+    if len(children) == 1 and isinstance(children[0], (list, tuple)):
+        children = children[0]
     return Gate('&', *children)
 
 
 def orGate(*children):
+    if len(children) == 1 and isinstance(children[0], (list, tuple)):
+        children = children[0]
     return Gate('|', *children)
 
 
 def xorGate(*children):
+    if len(children) == 1 and isinstance(children[0], (list, tuple)):
+        children = children[0]
     return Gate('^', *children)
 
+
 def notGate(*children):
+    if len(children) == 1 and isinstance(children[0], (list, tuple)):
+        children = children[0]
     return Gate('~', *children)
+
+
+def concatGate(*children):
+    if len(children) == 1 and isinstance(children[0], (list, tuple)):
+        children = children[0]
+    e = HWElement()
+    e.nature = 'GATE'
+    e.op = 'C'
+    e.inputs = list(children)
+    e.symbExp = simplify(Concat(*[c.symbExp for c in children]), pei=True)
+    e.leakageOut = set()
+    for inp in e.inputs:
+        e.leakageOut.update(inp.leakageOut)
+    return e
+
+
+def LShLGate(child, shval):
+    e = HWElement()
+    e.nature = 'GATE'
+    e.op = '<<'
+    e.inputs = [child]
+    e.symbExp = simplify(child.symbExp << shval, pei=True)
+    e.leakageOut = set()
+    for inp in e.inputs:
+        e.leakageOut.update(inp.leakageOut)
+    return e
+
+
+def LShRGate(child, shval):
+    e = HWElement()
+    e.nature = 'GATE'
+    e.op = 'LS'
+    e.inputs = [child]
+    e.symbExp = simplify(LShR(child.symbExp, shval), pei=True)
+    e.leakageOut = set()
+    for inp in e.inputs:
+        e.leakageOut.update(inp.leakageOut)
+    return e
+
+
+def AShRGate(child, shval):
+    e = HWElement()
+    e.nature = 'GATE'
+    e.op = '>>'
+    e.inputs = [child]
+    e.symbExp = simplify(child.symbExp >> shval, pei=True)
+    e.leakageOut = set()
+    for inp in e.inputs:
+        e.leakageOut.update(inp.leakageOut)
+    return e
+
+
+def extractGate(msb, lsb, child):
+    e = HWElement()
+    e.nature = 'GATE'
+    e.op = 'E'
+    e.inputs = [child]
+    e.symbExp = simplify(Extract(msb, lsb, child.symbExp), pei=True)
+    e.leakageOut = set()
+    for inp in e.inputs:
+        e.leakageOut.update(inp.leakageOut)
+    return e
+
+
+def gmulGadget(n0, n1):
+    cstgfIrr = inputGate(constant(Node.gfIrr, 8))
+    aExt = n0
+    bExt = n1
+    pExt = inputGate(constant(0, 8))
+
+    for i in range(8):
+        a = aExt
+        b = bExt
+        p = pExt
+
+        b0 = extractGate(0, 0, b)
+        b0Word = concatGate([b0] * 8)
+        a0 = andGate(a, b0Word)
+        newP = xorGate(a0, p)
+
+        a7 = extractGate(7, 7, a)
+        a7Word = concatGate([a7] * 8)
+        a1 = LShLGate(a, 1)
+        newA = xorGate(a1, andGate(a7Word, cstgfIrr))
+
+        if i != 7:
+            newB = LShRGate(b, 1)
+            aExt = newA
+            bExt = newB
+        pExt = newP
+
+    return pExt
+
 
 def inputGate(child):
     return Gate('I', child)
@@ -143,8 +260,8 @@ class Register(HWElement):
         self.leakageOut = set()
         self.leakageOut.add(inp.symbExp)
 
-    def dump(filename):
-        dumpCircuit(self, filename)
+    def dump(self, filename):
+        dumpCircuit(filename, self)
 
     def __str__(self):
         s = ''
@@ -162,14 +279,62 @@ def getReachableGates(g, rg):
         getReachableGates(child, rg)
 
 
+class CheckSecurityResult(int):
+    def __new__(cls, nbLeaks, nbTuples):
+        obj = super().__new__(cls, nbLeaks)
+        obj.nbLeaks = nbLeaks
+        obj.nbTuples = nbTuples
+        return obj
+
+    def __iter__(self):
+        yield self.nbLeaks
+        yield self.nbTuples
+
+    def __getitem__(self, idx):
+        if idx == 0:
+            return self.nbLeaks
+        elif idx == 1:
+            return self.nbTuples
+        raise IndexError
+
+
 def dumpCircuit(filename, *outputs):
+    if len(outputs) == 1 and isinstance(outputs[0], (list, tuple, set)):
+        outputs = list(outputs[0])
     reachableGates = set()
     for gate in outputs:
         getReachableGates(gate, reachableGates)
     HWElement.dumpCircuitGates(filename, reachableGates)
 
 
-def checkSecurity(order, withGlitches, secProp, *outputList):
+def checkSecurity(order, withGlitches, secProp, *args, **kwargs):
+    outputList = None
+    noFalsePositive = kwargs.get('noFalsePositive', False)
+    verbose = kwargs.get('verbose', False)
+    nbCheck = kwargs.get('nbCheck', None)
+
+    for arg in args:
+        if isinstance(arg, bool):
+            if not noFalsePositive:
+                noFalsePositive = arg
+            else:
+                verbose = arg
+        elif isinstance(arg, int):
+            nbCheck = arg
+        elif outputList is None:
+            outputList = arg
+
+    if outputList is None:
+        outputList = []
+    elif isinstance(outputList, HWElement):
+        outputList = [[outputList]]
+    elif isinstance(outputList, (list, tuple, set)):
+        outputList = list(outputList)
+        if len(outputList) > 0 and isinstance(outputList[0], HWElement):
+            outputList = [outputList]
+        elif len(outputList) > 0 and isinstance(outputList[0], (list, tuple, set)):
+            outputList = [list(x) for x in outputList]
+
     print('# Checking Security at order %d (%s, %s property)' % (order, withGlitches and 'with glitches' or 'no glitches', secProp))
 
     def tupleEnum(gateList, order, includePartialTuples):
@@ -204,7 +369,7 @@ def checkSecurity(order, withGlitches, secProp, *outputList):
 
 
     #################
-    def tupleEnumPINI(outputList, internalGatesList, order):
+    def tupleEnumPINI(outputList, internalGatesList, order, includePartialTuples):
 
         tuples = set()
 
@@ -245,12 +410,12 @@ def checkSecurity(order, withGlitches, secProp, *outputList):
                             t.add(gate.symbExp)
                     return t
  
-                if nbTaken == nbInternal:
-                    probeList = outputSharesList + t
+                if nbTaken == nbInternal or (includePartialTuples and nbTaken > 0):
+                    probeList = outputSharesList + t[0:nbTaken]
                     #print('# Adding full tuple (' + ', '.join(map(lambda x: '%d' % x.num, sorted(probeList, key = lambda x: x.num))) + ')')
-                    assert(nbTaken == order - len(sharesTakenTuple))
                     tuples.add((tuple(getLeakExps(probeList)), tuple(probeList), nbTaken, sharesTakenTuple))
-                    return
+                    if nbTaken == nbInternal:
+                        return
 
                 for idx in range(i, len(internalGatesList)):
                     t[nbTaken] = internalGatesList[idx]
@@ -510,7 +675,7 @@ def checkSecurity(order, withGlitches, secProp, *outputList):
     if secProp == 'pini' or secProp == 'opini':
         internalGates = list(set(gates) - set(outputs))
         #print('# Internal gates: ' + ', '.join(map(lambda x: '%d' % x.num, sorted(internalGates, key = lambda x: x.num))))
-        tuples = tupleEnumPINI(outputList, internalGates, order)
+        tuples = tupleEnumPINI(outputList, internalGates, order, doRemSingleInputProbesOpt)
     else:
         tuples = tupleEnum(gates, order, doRemSingleInputProbesOpt)
     print('# Number of tuples: %d' % len(tuples))
@@ -535,27 +700,29 @@ def checkSecurity(order, withGlitches, secProp, *outputList):
     for t in tuples:
         #print('# Checking expression for component(s) (%s): %s' % (', '.join(map(lambda x: '%d' % x.num, t[1])), ', '.join(map(lambda x: '%s' % x, t[0]))))
         if secProp == 'tps':
-            res = checkTpsVal(Concat(*t[0]))
+            res = tpsNoFalsePositive(t[0], True) if noFalsePositive else tps(t[0], True)
         elif secProp == 'ni':
-            #print('# checking NI for exps %s and maxShareOcc = %d' % (', '.join(map(lambda x: '%s' % x, t[0])), len(t[1])))
-            res = checkNIVal(Concat(*t[0]), len(t[1]))
+            res = niNoFalsePositive(t[0], len(t[1]), True) if noFalsePositive else ni(t[0], len(t[1]), True)
         elif secProp == 'rni':
-            #print('# checking RNI for exps %s and maxShareOcc = (nbShares - 1) - %d' % (', '.join(map(lambda x: '%s' % x, t[0])), (order - len(t[1]))))
-            res = checkRNIVal(Concat(*t[0]), (order - len(t[1])))
+            diff = order - len(t[1])
+            res = rniNoFalsePositive(t[0], diff) if noFalsePositive else rni(t[0], diff)
         elif secProp == 'sni':
             nbOutputProbes = 0
             for probe in t[1]:
                 if probe in outputs:
                     nbOutputProbes += 1
-            res = checkNIVal(Concat(*t[0]), len(t[1]) - nbOutputProbes)
+            maxShareOcc = len(t[1]) - nbOutputProbes
+            res = niNoFalsePositive(t[0], maxShareOcc, True) if noFalsePositive else ni(t[0], maxShareOcc, True)
         elif secProp == 'pini':
-            res = checkPINIVal(Concat(*t[0]), (t[2], t[3]))
+            outIdxs = set(t[3])
+            res = piniNoFalsePositive(t[0], t[2], outIdxs, True) if noFalsePositive else pini(t[0], t[2], outIdxs, True)
         elif secProp == 'opini':
-            res = checkOPINIVal(Concat(*t[0]), (t[2], t[3], allOutputLeakages))
+            outIdxs = set(t[3])
+            res = opiniNoFalsePositive(t[0], t[2], outIdxs, allOutputLeakages, True) if noFalsePositive else opini(t[0], t[2], outIdxs, allOutputLeakages, True)
         else:
-            assert(False)
+            assert False
 
-        if not res[0]:
+        if not res:
             #print('# Leaking expression for component(s) (%s): %s' % (', '.join(map(lambda x: '%d' % x.num, t[1])), ', '.join(map(lambda x: '%s' % x, t[0]))))
             leakingHwe.append(t)
 
@@ -567,5 +734,5 @@ def checkSecurity(order, withGlitches, secProp, *outputList):
     else:
         print('# Circuit is secure in the %s security model at order %d %s glitches' % (secProp, order, withGlitches and 'with' or 'without'))
 
-    return len(leakingHwe), len(tuples)
+    return CheckSecurityResult(len(leakingHwe), len(tuples))
 

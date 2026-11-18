@@ -1,19 +1,15 @@
-#!/usr/bin/python
-
-from __future__ import print_function
-
+#!/usr/bin/env python3
+# This file was automatically ported from VerifMSI++
 from verif_msi import *
+import random
 
 
 c0 = constant(0x12345678, 32)
 c1 = constant(8, 8)
-c3 = Extract(15, c1, c0)
+c2 = constant(15, 8)
+n = Extract(c2, c1, c0)
 
-# result is 0x56
-wres = constant(0x56, 8)
+res = constant(0x56, 8)
 
-checkResults(c3, wres)
-
-c3.dump('graph.dot')
-
+checkResults(n, res)
 

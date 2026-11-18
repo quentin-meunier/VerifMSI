@@ -1,18 +1,13 @@
-#!/usr/bin/python
-
-from __future__ import print_function
-
+#!/usr/bin/env python3
+# This file was automatically ported from VerifMSI++
 from verif_msi import *
-
+import random
 
 c0 = constant(0, 8)
 c1 = constant(5, 8)
 
 n0 = c0 + c1
 
-# result is 5
 checkResults(n0, c1)
-
-n0.dump('graph.dot')
 
 

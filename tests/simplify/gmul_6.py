@@ -1,19 +1,13 @@
-#!/usr/bin/python
-
-from __future__ import print_function
-
+#!/usr/bin/env python3
+# This file was automatically ported from VerifMSI++
 from verif_msi import *
+import random
 
+a = symbol("a", 'P', 8)
 
-a = symbol('a', 'P', 8)
-
-
-r = OpNode('M', [a, a, a, a])
-
+n = GMul(a, a, a, a)
 
 res = GPow(a, constant(4, 8))
 
-checkResults(r, res)
-
-
+checkResults(n, res)
 

@@ -1,0 +1,23 @@
+(1) old LV criterion, no more than 1 share / input
+(2) Input
+(3) Input product
+(4) Random
+(5) Redundant Exp (other exp with identical masking masks, no non masking mask occurrences (both in self and other), same or more inputs in other)
+(6) no more than 1 share / input + no rand
+(7) VerifMSI = (2) + (3) + (5) + (6)
+(8) IromMask = (2) + (3) + (4) + (5)
+
+                                               Nb.                (1)   (2)   (3)   (4)   (5)   (6)   (7)   (8)
+* a[i], b[i]                                   14  2N              o     o                       o     o     o
+* a[i].b[i]                                    49  (N * N)         o           o                 o     o     o
+* z[i]                                         21  N(N - 1) / 2    o                 o                 o     o
+* a[i].b[j] ^ z_ij                             21  N(N - 1) / 2    o                       o                 o
+* a[i].b[j] ^ a[j].b[i] ^ z_ij                 21  N(N - 1) / 2                            o                 o
+* z[0][1] ^ ... ^ z[0][N - 1] ^ a[0].b[0]      5   N - 2           o
+* a[0].b[j] ^ a[j].b[0] ^ a[j].b[j] ^ z[0][j]  6   N - 1                                   o                 o
+
+Total:
+* Old LV:   nb. removed = 14 + 49 + 21 + 21 + 5 = 110,      Nb. Exps = 167 - 115 = 57
+* VerifMSI: nb. removed = 14 + 49 + 21 = 84,                Nb. Exps = 167 - 84  = 83
+* IronMask: nb. removed = 14 + 49 + 21 + 21 + 21 + 6 = 132, Nb. Exps = 167 - 132 = 35
+

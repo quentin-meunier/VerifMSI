@@ -1,20 +1,26 @@
-#!/usr/bin/python
-
-from __future__ import print_function
-
+#!/usr/bin/env python3
 from verif_msi import *
 
-m = symbol('m', 'M', 8)
+m = symbol("m", 'M', 8)
 n0 = ~m
-n1 = ~m
-
+n1 = n0
 n0.printMaskOcc()
-n1.printMaskOcc()
+
+checkMaskOcc(
+    n0,
+    [m, n0],
+    {},
+    {},
+    {m: {n0}}
+)
 
 e = n0 + n1
-
 e.printMaskOcc()
-e.dump('graph.dot')
 
-
-
+checkMaskOcc(
+    e,
+    None,
+    {},
+    {},
+    {m: {n0}}
+)

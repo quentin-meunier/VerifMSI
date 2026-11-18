@@ -17,7 +17,7 @@ symbolsByName = {}
 
 
 
-def registerArray(name, inWidth, outWidth, addr, size, func, content = None):
+def registerArray(name, inWidth, outWidth, addr, size, func, content=None, elemSize=None):
 
     if addr != None:
         if addr in registeredArraysByAddr:
@@ -37,7 +37,7 @@ def registerArray(name, inWidth, outWidth, addr, size, func, content = None):
         assert(False)
 
 
-    arr = ArrayExp(name, inWidth, outWidth, addr, size, func, content)
+    arr = ArrayExp(name, inWidth, outWidth, addr, size, func, content, elemSize)
 
     if addr != None:
         registeredArraysByAddr[addr] = arr
@@ -113,19 +113,25 @@ def getArrayAndOffsetConcrete(addr):
 
 
 
-def checkResults(res, ref, pei = False, usbv = False):
+def checkResults(res, ref, *args, pei=True, usbv=False):
     from .node import Node
     from .simplify import simplify, equivalence
     assert(isinstance(res, Node))
     assert(isinstance(ref, Node))
+
+    if len(args) == 1:
+        usbv = args[0]
+    elif len(args) >= 2:
+        pei = args[0]
+        usbv = args[1]
 
     nbBits = ref.width
     
     if nbBits != res.width:
         print('KO (nbBits on res: %d -- expected %d)' % (res.width, nbBits))
 
-    res_s = simplify(res, pei, usbv)
-    ref_s = simplify(ref, pei, usbv)
+    res_s = simplify(res, pei=pei, usbv=usbv)
+    ref_s = simplify(ref, pei=pei, usbv=usbv)
 
     print('res : %s [%d]' % (res_s, res_s.width))
     print('ref : %s [%d]' % (ref_s, ref_s.width))
@@ -141,8 +147,94 @@ def checkResults(res, ref, pei = False, usbv = False):
 
 def checkTpsResult(exp, expected):
     from .check_leakage import checkTpsVal
-    res, t0, t1 = checkTpsVal(exp)
+    res = checkTpsVal(exp)
+    if isinstance(res, tuple):
+        res = res[0]
     if res == expected:
+        print('OK')
+    else:
+        print('KO')
+
+
+def checkNIResult(exp, maxShares, expected):
+    from .check_leakage import checkNIVal
+    res = checkNIVal(exp, maxShares)
+    if isinstance(res, tuple):
+        res = res[0]
+    if res == expected:
+        print('OK')
+    else:
+        print('KO')
+
+
+def checkRNIResult(exp, maxShares, expected):
+    from .check_leakage import checkRNIVal
+    res = checkRNIVal(exp, maxShares)
+    if isinstance(res, tuple):
+        res = res[0]
+    if res == expected:
+        print('OK')
+    else:
+        print('KO')
+
+
+def checkPINIResult(exp, maxShares, expected):
+    from .check_leakage import checkPINIVal
+    res = checkPINIVal(exp, maxShares)
+    if isinstance(res, tuple):
+        res = res[0]
+    if res == expected:
+        print('OK')
+    else:
+        print('KO')
+
+
+def checkOPINIResult(exp, maxShares, expected):
+    from .check_leakage import checkOPINIVal
+    res = checkOPINIVal(exp, maxShares)
+    if isinstance(res, tuple):
+        res = res[0]
+    if res == expected:
+        print('OK')
+    else:
+        print('KO')
+
+
+def checkMaskOcc(n, expPreservedMask, expCurrentlyMasking, expMaskingMaskOcc, expOtherMaskOcc):
+    ok = True
+    if expPreservedMask is not None and not isinstance(expPreservedMask, tuple):
+        expPreservedMask = tuple(expPreservedMask)
+    if n.preservedMask != expPreservedMask:
+        ok = False
+    if n.currentlyMasking != expCurrentlyMasking:
+        ok = False
+    if len(n.maskingMaskOcc) != len(expMaskingMaskOcc):
+        ok = False
+    else:
+        for m, expCtrBaseMap in expMaskingMaskOcc.items():
+            if m not in n.maskingMaskOcc or len(n.maskingMaskOcc[m]) != len(expCtrBaseMap):
+                ok = False
+                break
+            for ctrBase, expCtrMap in expCtrBaseMap.items():
+                if ctrBase not in n.maskingMaskOcc[m] or len(n.maskingMaskOcc[m][ctrBase]) != len(expCtrMap):
+                    ok = False
+                    break
+                for ctr, expEntry in expCtrMap.items():
+                    if ctr not in n.maskingMaskOcc[m][ctrBase] or tuple(n.maskingMaskOcc[m][ctrBase][ctr]) != tuple(expEntry):
+                        ok = False
+                        break
+    if len(n.otherMaskOcc) != len(expOtherMaskOcc):
+        ok = False
+    else:
+        for m, expParents in expOtherMaskOcc.items():
+            if m not in n.otherMaskOcc:
+                ok = False
+                break
+            if selMskWNonMskngOccEnable():
+                if n.otherMaskOcc[m] != expParents:
+                    ok = False
+                    break
+    if ok:
         print('OK')
     else:
         print('KO')
@@ -186,12 +278,17 @@ def getRealShares(s, nbShares):
         assert(False)
         sys.exit(1)
     secretShared.add(s)
+    s.nbShares = nbShares
     pseudoShares = getPseudoSharesInternal(s, nbShares)
     res = []
     for i in range(nbShares):
-        shareName = s.symb + '[%d]' % i
-        a = SymbInternal(shareName, 'A', s.width, nbShares, i, s, pseudoShares[i])
-        symbolsByName[shareName] = a
+        strn = s.symb
+        if '#' in strn:
+            strn = strn.replace('#', '[%d]#' % i)
+        else:
+            strn = strn + '[%d]' % i
+        a = SymbInternal(strn, 'A', s.width, nbShares, i, s, pseudoShares[i])
+        symbolsByName[strn] = a
         res.append(a)
     return tuple(res)
 
@@ -211,7 +308,12 @@ def getPseudoShares(s, nbShares):
 def getPseudoSharesInternal(s, nbShares):
     res = []
     for i in range(0, nbShares - 1):
-        a = SymbInternal(s.symb + '@%d' % i, 'M', s.width)
+        strn = s.symb
+        if '#' in strn:
+            strn = strn.replace('#', '@%d#' % i)
+        else:
+            strn = strn + '@%d' % i
+        a = SymbInternal(strn, 'M', s.width)
         res.append(a)
     a0 = OpNode('^', [s] + res)
     res.insert(0, a0)
@@ -220,6 +322,8 @@ def getPseudoSharesInternal(s, nbShares):
 
 def replaceSharesWithSecretsAndMasks(e):
     def replaceSharesWithSecretsAndMasksRec(node, m):
+        if node in m:
+            return m[node]
         if not isinstance(node, OpNode):
             return node
         children = []
@@ -237,7 +341,6 @@ def replaceSharesWithSecretsAndMasks(e):
         return n
 
     m = {}
-    secrets = set()
     for s in e.shareOcc.keys():
         for sh in e.shareOcc[s].keys():
             m[sh] = sh.pseudoShareEq
@@ -245,8 +348,28 @@ def replaceSharesWithSecretsAndMasks(e):
     return replaceSharesWithSecretsAndMasksRec(e, m)
 
 
-
 def width(e):
     return e.width
+
+
+def finalize():
+    print('# Number of nodes per nature:')
+    for e in Node.allNodes:
+        print('# %s: %d' % (e, Node.allNodes[e]))
+
+
+def verifMSICleanup():
+    try:
+        from .hw import HWElement
+        HWElement.cleanup()
+    except (ImportError, AttributeError):
+        pass
+    ArrayExp.cleanup()
+    Node.cleanup()
+    secretShared.clear()
+    symbolsByName.clear()
+    registeredArraysByAddr.clear()
+    registeredArraysByName.clear()
+    registeredArrays.clear()
 
 

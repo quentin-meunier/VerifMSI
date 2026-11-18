@@ -1,24 +1,20 @@
-#!/usr/bin/python
-
-from __future__ import print_function
-
+#!/usr/bin/env python3
+# This file was automatically ported from VerifMSI++
 from verif_msi import *
-
-#    root       root
-#     ^          m
-#    /|\   ->
-#   k m k
+import random
 
 
-k0 = symbol('k0', 'S', 8)
-k1 = symbol('k1', 'S', 8)
+# root       root
+# ^          m
+# /|\   ->
+# k m k
 
-n0 = k0 ^ k1 ^ k0
+k0 = symbol("k0", 'S', 8)
+k1 = symbol("k1", 'S', 8)
 
-wres = k1
+n = k0 ^ k1 ^ k0
 
-checkResults(n0, wres)
+res = k1
 
-n0.dump('graph.dot')
-
+checkResults(n, res)
 

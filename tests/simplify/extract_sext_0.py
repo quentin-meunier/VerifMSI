@@ -1,19 +1,14 @@
-#!/usr/bin/python
-
-from __future__ import print_function
-
+#!/usr/bin/env python3
+# This file was automatically ported from VerifMSI++
 from verif_msi import *
+import random
 
 
-p = symbol('p', 'P', 8)
+p = symbol("p", 'P', 8)
 e = SignExt(24, p)
-
 n = Extract(30, 23, e)
 
-wres = SignExt(7, Extract(7, 7, p))
+res = SignExt(7, Extract(7, 7, p))
 
-checkResults(n, wres)
-
-n.dump('graph.dot')
-
+checkResults(n, res)
 

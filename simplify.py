@@ -7,6 +7,8 @@
 from .utils import *
 from .node import *
 from .simp_rules import getEquiv
+from .config import extendedSimplifyEnable, extendedMergeConcatEnable, bitSimplifyPlusEnable
+from .simp_conc import extendedMergeConcatExtract
 
 
 # Trying to merge current node with its children if associative and children have the same op
@@ -38,45 +40,176 @@ def mergeWithChildrenIfPossible(op, children):
 # Note: Concat(a8, b8) ^ Concat(c8, d8) ^ Concat(u4, v12) ^ Concat(w4, x12)
 #       will not be simplified to Concat(a8 ^ c8, b8 ^ d8) ^ Concat(u4 ^ w4, v12 ^ x12)
 #       This case can be added if it is encountered
-def mergeConcatChildren(op, children):
-    numConcatChildren = 0
-    firstConcatChild = None
-    mergeConcat = True
-    for child in children:
-        if child.op == 'C':
-            numConcatChildren += 1
-            if firstConcatChild == None:
-                firstConcatChild = child
+def mergeConcatChildren(op, children, usbv=False):
+    concatChildrenIdx = []
+    concatPresent = False
+    for i, child in enumerate(children):
+        if child.op == 'C' or isinstance(child, ConstNode):
+            concatPresent = concatPresent or (child.op == 'C')
+            concatChildrenIdx.append(i)
+    numConcatChildren = len(concatChildrenIdx)
+
+    if concatPresent and numConcatChildren >= 1 and usbv:
+        modified = False
+        for i in range(len(children)):
+            c = children[i]
+            if c.op in ('A', 'SLS', 's<<', 's>>', '+', 'E'):
+                l = []
+                for b in range(c.width):
+                    l.append(simplifyCore(Extract(b, b, c), usbv=True))
+                children[i] = OpNode('C', l) if len(l) > 1 else l[0]
+                modified = True
+        if modified:
+            concatChildrenIdx = []
+            concatPresent = False
+            for i, child in enumerate(children):
+                if child.op == 'C' or isinstance(child, ConstNode):
+                    concatPresent = concatPresent or (child.op == 'C')
+                    concatChildrenIdx.append(i)
+            numConcatChildren = len(concatChildrenIdx)
+
+    if concatPresent and numConcatChildren > 1:
+        removedChild = [False] * numConcatChildren
+        bitsTaken = []
+        currChild = [0] * numConcatChildren
+        currChildSize = [0] * numConcatChildren
+        for i in range(numConcatChildren):
+            child = children[concatChildrenIdx[i]]
+            if isinstance(child, ConstNode):
+                currChildSize[i] = child.width
             else:
-                if len(child.children) != len(firstConcatChild.children):
-                    mergeConcat = False
+                currChild[i] = len(child.children) - 1
+                currChildSize[i] = child.children[currChild[i]].width
+
+        remainingBits = children[0].width
+
+        while True:
+            nbBitsTaken = remainingBits
+            selChildIdx = -1
+
+            # Initializing width of segment with the first encountered non constant child
+            for i in range(numConcatChildren):
+                if removedChild[i]:
+                    continue
+                child = children[concatChildrenIdx[i]]
+                if child.op == 'C' and not isinstance(child.children[currChild[i]], ConstNode):
+                    selChildIdx = i
+                    nbBitsTaken = currChildSize[i]
                     break
-                for i in range(len(child.children)):
-                    if child.children[i].width != firstConcatChild.children[i].width:
-                        mergeConcat = False
-                        break
 
-    if mergeConcat and numConcatChildren > 1:
-        newChildren = []
-        xorsChildren = [[] for _ in range(len(firstConcatChild.children))]
-        for c in children:
-            if c.op == 'C':
-                for i in range(len(c.children)):
-                    xorsChildren[i].append(c.children[i])
+            if selChildIdx == -1:
+                for i in range(numConcatChildren):
+                    if removedChild[i]:
+                        continue
+                    if currChildSize[i] < nbBitsTaken:
+                        nbBitsTaken = currChildSize[i]
             else:
-                newChildren.append(c)
+                # Removing incompatible children with selected child
+                for i in range(numConcatChildren):
+                    if removedChild[i]:
+                        continue
+                    child = children[concatChildrenIdx[i]]
+                    if child.op == 'C':
+                        concatChild = child.children[currChild[i]]
+                        if not isinstance(concatChild, ConstNode) and concatChild.width != nbBitsTaken:
+                            removedChild[i] = True
+                        elif isinstance(concatChild, ConstNode) and currChildSize[i] < nbBitsTaken:
+                            removedChild[i] = True
 
-        concatChildren = []
-        for xorChildren in xorsChildren:
-            opNode = simplify(OpNode(op, xorChildren))
-            concatChildren.append(opNode)
+            bitsTaken.append(nbBitsTaken)
+            remainingBits -= nbBitsTaken
+            if remainingBits <= 0:
+                assert remainingBits == 0
+                break
 
-        if len(newChildren) == 0:
-            return 'C', concatChildren, True
-        else:
-            concatNode = simplify(OpNode('C', concatChildren))
-            newChildren.append(concatNode)
-            return op, newChildren, True
+            for i in range(numConcatChildren):
+                if removedChild[i]:
+                    continue
+                if currChildSize[i] > nbBitsTaken:
+                    currChildSize[i] -= nbBitsTaken
+                else:
+                    assert currChildSize[i] == nbBitsTaken
+                    currChild[i] -= 1
+                    currChildSize[i] = children[concatChildrenIdx[i]].children[currChild[i]].width
+
+        numKeptConcatChildren = sum(0 if removedChild[i] else 1 for i in range(numConcatChildren))
+
+        if numKeptConcatChildren > 1:
+            concatChildrenIdx_new = []
+            newChildren = []
+            concatChildIdx = 0
+            for i, child in enumerate(children):
+                if isinstance(child, ConstNode) or child.op == 'C':
+                    if not removedChild[concatChildIdx]:
+                        concatChildrenIdx_new.append(i)
+                    else:
+                        newChildren.append(child)
+                    concatChildIdx += 1
+                else:
+                    newChildren.append(child)
+
+            concatChildrenIdx = concatChildrenIdx_new
+            currChildIdx = [0] * numKeptConcatChildren
+            currChildSize = [0] * numKeptConcatChildren
+            for i in range(numKeptConcatChildren):
+                child = children[concatChildrenIdx[i]]
+                if isinstance(child, ConstNode):
+                    currChildSize[i] = child.width
+                else:
+                    currChildIdx[i] = len(child.children) - 1
+                    currChildSize[i] = child.children[currChildIdx[i]].width
+
+            concatChildren = []
+            for bt in bitsTaken:
+                cstChildren = []
+                otherChildren = []
+                for i in range(numKeptConcatChildren):
+                    child = children[concatChildrenIdx[i]]
+                    if isinstance(child, ConstNode):
+                        currChild = child
+                    else:
+                        currChild = child.children[currChildIdx[i]]
+
+                    if isinstance(currChild, ConstNode):
+                        cstChildren.append(Extract(currChildSize[i] - 1, currChildSize[i] - bt, currChild))
+                    else:
+                        otherChildren.append(currChild)
+                        assert currChild.width == bt
+
+                    if currChildSize[i] > bt:
+                        currChildSize[i] -= bt
+                    elif child.op == 'C':
+                        currChildIdx[i] -= 1
+                        if currChildIdx[i] >= 0:
+                            currChildSize[i] = children[concatChildrenIdx[i]].children[currChildIdx[i]].width
+
+                cstNode = None
+                opNode = None
+                if len(cstChildren) == 1:
+                    cstNode = cstChildren[0]
+                elif len(cstChildren) > 1:
+                    cstNode = simplifyCore(OpNode(op, cstChildren), usbv=usbv)
+                    assert isinstance(cstNode, ConstNode)
+
+                if len(otherChildren) == 1:
+                    opNode = otherChildren[0]
+                elif len(otherChildren) > 1:
+                    opNode = simplifyCore(OpNode(op, otherChildren), usbv=usbv)
+
+                if cstNode is None:
+                    concatChildren.append(opNode)
+                elif opNode is None:
+                    concatChildren.append(cstNode)
+                else:
+                    concatChildren.append(simplifyCore(OpNode(op, [cstNode, opNode]), usbv=usbv))
+
+            concatChildren.reverse()
+            if len(newChildren) == 0:
+                return 'C', concatChildren, True
+            else:
+                concatNode = simplifyCore(OpNode('C', concatChildren), usbv=usbv)
+                newChildren.append(concatNode)
+                return op, newChildren, True
 
     return op, children, False
 
@@ -119,7 +252,10 @@ def getBitDecompositionVarSingleBit(node, bit):
     #print('# Calling SymbInternal for node %s bit %d' % (node, bit))
     s = node.symb + "#" + str(bit)
     if node.symbType == 'A':
-        res = SymbInternal(s, 'A', 1, node.nbShares, node.shareNum, getBitDecompositionVar(node.origSecret, bit, bit), simplify(Extract(bit, bit, node.pseudoShareEq), True, True))
+        origSec = getBitDecompositionVar(node.origSecret, bit, bit)
+        if node.origSecret.nbShares is not None:
+            origSec.nbShares = node.origSecret.nbShares
+        res = SymbInternal(s, 'A', 1, node.nbShares, node.shareNum, origSec, simplify(Extract(bit, bit, node.pseudoShareEq), True, True))
     else:
         res = SymbInternal(s, node.symbType, 1)
 
@@ -160,49 +296,12 @@ def getBitDecompositionVar(node, msbIn = None, lsbIn = None):
 
 
 def getBitDecomposition(node):
-    #print('# getBitDecomposition, node = %s' % node)
-    if isinstance(node, ConstNode):
-        return node
-
-    if node.concatExtEq != None:
-        return node.concatExtEq
-
-    if isinstance(node, SymbNode):
-        be = getBitDecompositionVar(node)
-        node.concatExtEq = be
-        return be
-
-    if node.op == 'A':
-        # For arrays, the root node of the decomposition is not a Concat but an array node,
-        # whose child is a concat (or Array, or mult)
-        be = getBitDecomposition(node.children[1])
-        arr = ArrayExp.allArrays[node.children[0].strn]
-        newA = arr[be]
-        node.concatExtEq = newA
-        return newA
-
-    if node.op == '*' or node.op == 'M' or node.op == 'L' or node.op == 'X' or node.op == 'P':
-        # For multiplications, and GF operations, the root node of the decomposition is not
-        # a Concat but a '*' (or 'M', 'L', 'X', 'P') node whose children are concat nodes (or Array)
-        newChildren = []
-        for child in node.children:
-            newChild = getBitDecomposition(child)
-            newChildren.append(newChild)
-        newNode = OpNode(node.op, newChildren)
-        node.concatExtEq = newNode
-        return newNode
- 
-    l = []
-    for b in range(node.width - 1, -1, -1):
-        l.append(simplify(Extract(b, b, node), True, True))
-    be = Concat(*l)
-    node.concatExtEq = be
-    return be
+    return simplifyCore(node, useSingleBitVariables=True)
 
 
 
 #def factorize(mulOp, newChildren, width, addIsOr = True):
-def factorize(mulOp, addOp, newChildren, width):
+def factorize(mulOp, addOp, newChildren, width, usbv=False):
     hasChanged = True
     modified = False
     while hasChanged:
@@ -246,17 +345,17 @@ def factorize(mulOp, addOp, newChildren, width):
 
                                     if mulOp == 'M':
                                         assert(addOp == '^')
-                                        xorNode = simplify(xorLeftNode ^ xorRighNode)
+                                        xorNode = simplifyCore(xorLeftNode ^ xorRighNode, pei=True, usbv=usbv)
                                     elif mulOp == '*':
                                         assert(addOp == '+')
-                                        xorNode = simplify(xorLeftNode + xorRighNode)
+                                        xorNode = simplifyCore(xorLeftNode + xorRighNode, pei=True, usbv=usbv)
                                     elif mulOp == '|':
                                         assert(addOp == '&')
-                                        xorNode = simplify(xorLeftNode & xorRighNode)
+                                        xorNode = simplifyCore(xorLeftNode & xorRighNode, pei=True, usbv=usbv)
                                     elif mulOp == '&' and addOp == '|':
-                                        xorNode = simplify(xorLeftNode | xorRighNode)
+                                        xorNode = simplifyCore(xorLeftNode | xorRighNode, pei=True, usbv=usbv)
                                     elif mulOp == '&' and addOp == '^':
-                                        xorNode = simplify(xorLeftNode ^ xorRighNode)
+                                        xorNode = simplifyCore(xorLeftNode ^ xorRighNode, pei=True, usbv=usbv)
                                     newGrandChildren = [factor, xorNode]
                                     break
                                 l += 1
@@ -283,9 +382,9 @@ def factorize(mulOp, addOp, newChildren, width):
                                         xorLeftNode = OpNode(mulOp, xorLeftChildren)
     
                                     if mulOp == 'M':
-                                        xorNode = simplify(xorLeftNode ^ Const(0x1, width))
+                                        xorNode = simplifyCore(xorLeftNode ^ Const(0x1, width), pei=True, usbv=usbv)
                                     elif mulOp == '*':
-                                        xorNode = simplify(xorLeftNode + Const(0x1, width))
+                                        xorNode = simplifyCore(xorLeftNode + Const(0x1, width), pei=True, usbv=usbv)
                                     hasChanged = True
                                     newGrandChildren = [factor, xorNode]
                                 elif mulOp == '&' and addOp == '^':
@@ -300,7 +399,7 @@ def factorize(mulOp, addOp, newChildren, width):
                     if hasChanged and newGrandChildren != None:
                         newChildren.pop(max(i, j))
                         newChildren.pop(min(i, j))
-                        mulNode = simplify(OpNode(mulOp, newGrandChildren))
+                        mulNode = simplifyCore(OpNode(mulOp, newGrandChildren), pei=True, usbv=usbv)
                         newChildren.append(mulNode)
                         modified = True
                         break
@@ -312,20 +411,19 @@ def factorize(mulOp, addOp, newChildren, width):
 
 
 
-def simplify(node, propagateExtractInwards = True, useSingleBitVariables = False):
-    #assert(not useSingleBitVariables or propagateExtractInwards)
-    #if propagateExtractInwards and useSingleBitVariables:
-    #    return getBitDecomposition(node)
-    return simplifyCore(node, propagateExtractInwards, useSingleBitVariables)
+def simplify(node, useSingleBitVariables=False, *args, **kwargs):
+    if len(args) >= 1:
+        useSingleBitVariables = args[0]
+    if 'usbv' in kwargs:
+        useSingleBitVariables = kwargs['usbv']
+    return simplifyCore(node, useSingleBitVariables)
 
 
-def simplifyAndNotPEI(node):
-    return simplifyCore(node, False, False)
-
-
-def simplifyCore(node, propagateExtractInwards, useSingleBitVariables):
-    # Verify that using single-bit variables implies propagating Extract inwards
-    assert(not useSingleBitVariables or propagateExtractInwards)
+def simplifyCore(node, useSingleBitVariables=False, *args, **kwargs):
+    if len(args) >= 1:
+        useSingleBitVariables = args[0]
+    if 'usbv' in kwargs:
+        useSingleBitVariables = kwargs['usbv']
     #print('# Simplifying node %s' % node)
 
     def setSimpEqAndReturn(node, simpEq):
@@ -398,7 +496,8 @@ def simplifyCore(node, propagateExtractInwards, useSingleBitVariables):
             msb = msbNode.cst
             lsb = lsbNode.cst
 
-            if op == 'E' and lsb == 0 and msb == child.width - 1:
+            # QM FIXME: removed 'op == EXTRACT' here, propagate in verif_msi
+            if lsb == 0 and msb == child.width - 1:
                 if isinstance(child, ConstNode):
                     return setSimpEqAndReturn(node, child)
                 if isinstance(child, SymbNode):
@@ -701,7 +800,7 @@ def simplifyCore(node, propagateExtractInwards, useSingleBitVariables):
                         op = 'C'
                         break
  
-            elif propagateExtractInwards and child.op in Node.bitwiseOps:
+            elif child.op in Node.bitwiseOps:
                 # Extract(m, l, e & f) -> Extract(m, l, e) & Extract(m, l, f)
                 newChildren0 = []
                 for gchild in child.children:
@@ -710,14 +809,14 @@ def simplifyCore(node, propagateExtractInwards, useSingleBitVariables):
                 op = child.op
                 break
 
-            elif propagateExtractInwards and child.op == '~':
+            elif child.op == '~':
                 gchild = child.children[0]
                 newExtractNode = Extract(msb, lsb, gchild)
                 newChildren0 = [newExtractNode]
                 op = '~'
                 break
 
-            elif propagateExtractInwards and child.op == '+':
+            elif bitSimplifyPlusEnable() and child.op == '+':
                 if msb == lsb:
                     idx = 0
                     child0 = child.children[0]
@@ -766,7 +865,7 @@ def simplifyCore(node, propagateExtractInwards, useSingleBitVariables):
                     op = 'C'
                     break
 
-            elif propagateExtractInwards and child.op == '-':
+            elif bitSimplifyPlusEnable() and child.op == '-':
                 if msb == lsb:
                     ci = Const(1, 1)
                     child0 = child.children[0]
@@ -791,7 +890,7 @@ def simplifyCore(node, propagateExtractInwards, useSingleBitVariables):
                     op = 'C'
                     break
 
-            elif propagateExtractInwards and (child.op == 'X' or child.op == 'L') and msb == 7 and lsb == 0:
+            elif (child.op == 'X' or child.op == 'L') and msb == 7 and lsb == 0:
                 # Extract(7, 0, GExp(e)) -> GExp(Extract(7, 0, e))
                 # Condition could be more precise / different: child.children[0]).op == 'C', len(child.children[0]) == 2, child.children[0].children[0].cst == 0, child.width > 8, etc.
                 # This is to deal with the case Extract(m, l, GExp(Concat(0, e))) -> GExp(e)
@@ -799,20 +898,8 @@ def simplifyCore(node, propagateExtractInwards, useSingleBitVariables):
                 newChildren0 = [newExtractNode]
                 op = child.op
                 break
-                
-            elif propagateExtractInwards and (child.op == 'A' or child.op == '*' or child.op == 'M' or child.op == 'L' or child.op == 'X' or child.op == 'P'):
-                # Particular case: we cannot propagate extract inwards but we need to remove the occurrences of multiple-bit variables
-                # (otherwise the TPS algorithm can conclude no leakage and be wrong)
-                if useSingleBitVariables:
-                    decompNode = getBitDecomposition(child)
-                    simplifiedNode = Extract(msbNode, lsbNode, decompNode)
-                    return setSimpEqAndReturn(node, simplifiedNode)
-                else:
-                    return setSimpEqAndReturn(node, defaultNode(node, op, newChildren0, newChildren0 != None))
 
             else:
-                #print('node: %s' % node)
-                assert(not propagateExtractInwards)
                 break
 
 
@@ -824,7 +911,7 @@ def simplifyCore(node, propagateExtractInwards, useSingleBitVariables):
 
     newChildren = []
     for child in newChildren0:
-        newChildren.append(simplifyCore(child, propagateExtractInwards, useSingleBitVariables))
+        newChildren.append(simplifyCore(child, useSingleBitVariables))
     #print('All children simplified:')
     #for child in newChildren:
     #    print('   %s' % child)
@@ -901,70 +988,125 @@ def simplifyCore(node, propagateExtractInwards, useSingleBitVariables):
         newChildren, m = mergeWithChildrenIfPossible(op, newChildren)
         modified = modified or m
 
-        op, newChildren, m = mergeConcatChildren(op, newChildren)
-        modified = modified or m
+        if op != '+':
+            op, newChildren, m = mergeConcatChildren(op, newChildren, usbv=useSingleBitVariables)
+            modified = modified or m
 
 
     if op == '^':
-        # simplify e ^ 0 to e
-        # simplify e ^ e to 0
-        # simplify e ^ 1 to ~e
-        # simplify ~a ^ ~b ^ ~c to ~(a ^ b ^ c)
-        i = 0
-        while i < len(newChildren):
-            child0 = newChildren[i]
-            j = i + 1
-            removed = False
-            while j < len(newChildren):
-                child1 = newChildren[j]
-                if equivalence(child0, child1):
-                    # Suppressing child0 and child1 from list starting
-                    # with child1 in order not to modify child0 index
-                    newChildren.pop(j)
-                    newChildren.pop(i)
-                    removed = True
-                    modified = True
-                    break
-                j += 1
-            if not removed:
+        while True:
+            modifiedByFactorization = False
+            # simplify e ^ 0 to e
+            # simplify e ^ e to 0
+            # simplify e ^ 1 to ~e
+            # simplify ~a ^ ~b ^ ~c to ~(a ^ b ^ c)
+            i = 0
+            while i < len(newChildren):
+                child0 = newChildren[i]
+                j = i + 1
+                removed = False
+                while j < len(newChildren):
+                    child1 = newChildren[j]
+                    if equivalence(child0, child1):
+                        newChildren.pop(j)
+                        newChildren.pop(i)
+                        removed = True
+                        modified = True
+                        break
+                    j += 1
+                if not removed:
+                    i += 1
+
+            # Constant propagation
+            i = 0
+            constVal = 0
+            previousConstIdx = -1
+            while i < len(newChildren):
+                child = newChildren[i]
+                if isinstance(child, ConstNode):
+                    if previousConstIdx == -2:
+                        # Two or more previous constants
+                        constVal = constVal ^ child.cst
+                        newChildren.pop(i)
+                        continue
+                    elif previousConstIdx != -1:
+                        # 2nd encountered constant
+                        constVal = newChildren[previousConstIdx].cst ^ child.cst
+                        newChildren.pop(previousConstIdx)
+                        i -= 1
+                        newChildren.pop(i)
+                        modified = True
+                        previousConstIdx = -2
+                        continue
+                    elif child.cst == 0:
+                        newChildren.pop(i)
+                        modified = True
+                        continue
+                    elif child.cst == (1 << width) - 1:
+                        constVal = child.cst
+                        newChildren.pop(i)
+                        modified = True
+                        previousConstIdx = -2
+                        continue
+                    else:
+                        previousConstIdx = i
                 i += 1
 
-        # Constant propagation
-        # FIXME: modified is set to True in case there is only one constant and the expression does not change
-        i = 0
-        constVal = 0
-        while i < len(newChildren):
-            child = newChildren[i]
-            if isinstance(child, ConstNode):
-                constVal = constVal ^ child.cst
-                newChildren.pop(i)
-                modified = True
-                continue
-            i += 1
-        if constVal != 0:
-            if constVal == (1 << width) - 1:
-                addNotNode = not addNotNode
-            else:
-                if addNotNode:
-                    newChildren.append(Const(constVal ^ ((1 << width) - 1), width))
-                    addNotNode = False
-                else:
-                    newChildren.append(Const(constVal, width))
+            if previousConstIdx == -2:
+                if constVal != 0:
+                    if constVal == (1 << width) - 1:
+                        addNotNode = not addNotNode
+                    else:
+                        if addNotNode:
+                            constVal = constVal ^ ((1 << width) - 1)
+                            addNotNode = False
+                        newChildren.append(Const(constVal, width))
 
+            # a * b ^ a * c -> a * (b ^ c)
+            if node.hasWordOp:
+                m = factorize('M', '^', newChildren, width, usbv=useSingleBitVariables)
+                modified = modified or m
+                modifiedByFactorization = modifiedByFactorization or m
 
-        # a * b ^ a * c -> a * (b ^ c)
-        # Remark: the factorisation is not unique
-        #   a * b ^ a * c ^ b * c
-        # = a * (b ^ c) ^ b * c
-        # = b * (a ^ c) ^ a * c
-        # = c * (a ^ b) ^ a * b
-        if node.hasWordOp:
-            m = factorize('M', '^', newChildren, width)
+            m = factorize('&', '^', newChildren, width, usbv=useSingleBitVariables)
             modified = modified or m
+            modifiedByFactorization = modifiedByFactorization or m
 
-        m = factorize('&', '^', newChildren, width)
-        modified = modified or m
-        # FIXME: it is possible here to have a const(0) among newChildren
+            if extendedSimplifyEnable():
+                # (~p & x) ^ (p & y) -> x ^ (p & (x ^ y))
+                for i0 in range(len(newChildren)):
+                    childi0 = newChildren[i0]
+                    if childi0.op == '&' and len(childi0.children) == 2:
+                        replacement = False
+                        for j0 in range(2):
+                            childj0 = childi0.children[j0]
+                            nodeX = childi0.children[1 - j0]
+                            if childj0.op == '~' and (nodeX.op == '^' or isinstance(nodeX, SymbNode)):
+                                for i1 in range(len(newChildren)):
+                                    if i0 == i1:
+                                        continue
+                                    childi1 = newChildren[i1]
+                                    if childi1.op == '&' and len(childi1.children) == 2:
+                                        for j1 in range(2):
+                                            childj1 = childi1.children[j1]
+                                            nodeY = childi1.children[1 - j1]
+                                            if equivalence(childj0.children[0], childj1):
+                                                xorNode = simplifyCore(nodeX ^ nodeY, usbv=useSingleBitVariables)
+                                                andNode = simplifyCore(xorNode & childj1, usbv=useSingleBitVariables)
+                                                newChildren[i0] = nodeX
+                                                newChildren[i1] = andNode
+                                                modified = True
+                                                replacement = True
+                                                break
+                                        if replacement:
+                                            break
+                            if replacement:
+                                break
+                        if replacement:
+                            continue
+
+            if not modifiedByFactorization:
+                break
 
 
         if node.hasWordOp:
@@ -1056,7 +1198,7 @@ def simplifyCore(node, propagateExtractInwards, useSingleBitVariables):
 
         # Factorization
         if node.hasWordOp:
-            m = factorize('*', '+', newChildren, width)
+            m = factorize('*', '+', newChildren, width, usbv=useSingleBitVariables)
             modified = modified or m
 
             # FIXME: this block was not under the wordOp condition before; recheck that tests still pass
@@ -1103,77 +1245,269 @@ def simplifyCore(node, propagateExtractInwards, useSingleBitVariables):
 
 
     elif op == '&' or op == '|':
-        # simplify a | (~a & b) to a | b
-        #          a & (~a | b) to a & b
-        # an iteration loop is necessary, until no change is made...
-        # e.g.                (~a & ~b & c) | (~a & b) | a
-        # after 1 iteration:  (~b & c) | b | a
-        # after 2 iterations: c | b | a
         hasChanged = True
         while hasChanged:
             hasChanged = False
+            # simplify e & e and e | e to e
             i = 0
             while i < len(newChildren):
                 child0 = newChildren[i]
-                if child0.op == op1:
-                    j = 0
-                    idxToRemove = set()
-                    while j < len(child0.children):
+                j = i + 1
+                while j < len(newChildren):
+                    child1 = newChildren[j]
+                    if equivalence(child0, child1):
+                        newChildren.pop(j)
+                        modified = True
+                    else:
+                        j += 1
+                i += 1
+
+            # simplify e & ~e to 0 and e | ~e to 1
+            i = 0
+            while i < len(newChildren):
+                child0 = newChildren[i]
+                j = i + 1
+                while j < len(newChildren):
+                    child1 = newChildren[j]
+                    if (child0.op == '~' and equivalence(child0.children[0], child1)) or (child1.op == '~' and equivalence(child0, child1.children[0])):
+                        return setSimpEqAndReturn(node, cst0)
+                    else:
+                        j += 1
+                i += 1
+
+            # Simplify  a &  (a ^ b) to  a & ~b
+            #          ~a &  (a ^ b) to ~a &  b
+            #           a & ~(a ^ b) to  a &  b
+            #          ~a & ~(a ^ b) to ~a & ~b
+            #           a |  (a ^ b) to  a |  b
+            #          ~a |  (a ^ b) to ~a | ~b
+            #           a | ~(a ^ b) to  a | ~b
+            #          ~a | ~(a ^ b) to ~a |  b
+            if extendedSimplifyEnable():
+                i = 0
+                while i < len(newChildren):
+                    child0 = newChildren[i]
+                    if child0.op == '^' or (child0.op == '~' and child0.children[0].op == '^'):
+                        xorHasNot = (op == '|')
+                        if child0.op == '~':
+                            child0 = child0.children[0]
+                            xorHasNot = not xorHasNot
                         k = 0
+                        idxToRemove = set()
+                        tempIdxToRemove = set()
                         while k < len(newChildren):
                             if i == k:
                                 k += 1
                                 continue
                             child1 = newChildren[k]
-                            if child1.op == '~' and equivalence(child1.children[0], child0.children[j]) or child0.children[j].op == '~' and equivalence(child1, child0.children[j].children[0]):
-                                idxToRemove.add(j)
+                            varHasNot = False
+                            if child1.op == '~':
+                                child1 = child1.children[0]
+                                varHasNot = True
+                            if child1.op == '^':
+                                allPresent = True
+                                tempIdxToRemove.clear()
+                                for gChild1 in child1.children:
+                                    present = False
+                                    j = 0
+                                    while j < len(child0.children):
+                                        xorChild = child0.children[j]
+                                        if equivalence(gChild1, xorChild):
+                                            present = True
+                                            tempIdxToRemove.add(j)
+                                            break
+                                        j += 1
+                                    allPresent = allPresent and present
+                                    if not allPresent:
+                                        break
+                                if allPresent:
+                                    idxToRemove.update(tempIdxToRemove)
+                                    xorHasNot = xorHasNot ^ (not varHasNot)
+                            else:
+                                j = 0
+                                while j < len(child0.children):
+                                    xorChild = child0.children[j]
+                                    if equivalence(child1, xorChild):
+                                        idxToRemove.add(j)
+                                        xorHasNot = xorHasNot ^ (not varHasNot)
+                                        break
+                                    j += 1
+                            if len(idxToRemove) == len(child0.children) - 1:
                                 break
                             k += 1
-                        j += 1
-                    if len(idxToRemove) != 0:
-                        newGrandChildren = list()
-                        for idx in range(len(child0.children)):
-                            if idx not in idxToRemove:
-                                newGrandChildren.append(child0.children[idx])
-                        if len(newGrandChildren) == 0:
-                            newChild = cst1
-                        elif len(newGrandChildren) == 1:
-                            newChild = newGrandChildren[0]
-                        else:
-                            newChild = OpNode(op1, newGrandChildren)
-                        newChildren[i] = newChild
-                        newChildren, m = mergeWithChildrenIfPossible(op, newChildren)
-                        hasChanged = True
-                        modified = True
-                i += 1
 
-        # simplify e & e and e | e to e
-        i = 0
-        while i < len(newChildren):
-            child0 = newChildren[i]
-            j = i + 1
-            while j < len(newChildren):
-                child1 = newChildren[j]
-                if equivalence(child0, child1):
-                    # Suppressing child1
-                    newChildren.pop(j)
-                    modified = True
-                else:
-                    j += 1
-            i += 1
+                        if len(idxToRemove) != 0:
+                            newGrandChildren = []
+                            for idx in range(len(child0.children)):
+                                if idx not in idxToRemove:
+                                    newGrandChildren.append(child0.children[idx])
+                            if len(newGrandChildren) == 0:
+                                newChild = Const(0, width)
+                            elif len(newGrandChildren) == 1:
+                                newChild = newGrandChildren[0]
+                            else:
+                                newChild = OpNode('^', newGrandChildren)
+                            if xorHasNot:
+                                newChild = ~newChild
+                            newChildren[i] = newChild
+                            newChildren, m = mergeWithChildrenIfPossible(op, newChildren)
+                            hasChanged = True
+                            modified = True
+                    i += 1
+            else:
+                i = 0
+                while i < len(newChildren):
+                    child0 = newChildren[i]
+                    if child0.op == '^' or (child0.op == '~' and child0.children[0].op == '^'):
+                        xorHasNot = (op == '|')
+                        if child0.op == '~':
+                            child0 = child0.children[0]
+                            xorHasNot = not xorHasNot
+                        j = 0
+                        idxToRemove = set()
+                        while j < len(child0.children):
+                            xorChild = child0.children[j]
+                            k = 0
+                            while k < len(newChildren):
+                                if i == k:
+                                    k += 1
+                                    continue
+                                child1 = newChildren[k]
+                                varHasNot = False
+                                if child1.op == '~':
+                                    child1 = child1.children[0]
+                                    varHasNot = True
+                                if equivalence(child1, xorChild):
+                                    idxToRemove.add(j)
+                                    xorHasNot = xorHasNot ^ (not varHasNot)
+                                    break
+                                k += 1
+                            j += 1
+                        if len(idxToRemove) != 0:
+                            newGrandChildren = []
+                            for idx in range(len(child0.children)):
+                                if idx not in idxToRemove:
+                                    newGrandChildren.append(child0.children[idx])
+                            if len(newGrandChildren) == 0:
+                                newChild = Const(0, width)
+                            elif len(newGrandChildren) == 1:
+                                newChild = newGrandChildren[0]
+                            else:
+                                newChild = OpNode('^', newGrandChildren)
+                            if xorHasNot:
+                                newChild = ~newChild
+                            newChildren[i] = newChild
+                            newChildren, m = mergeWithChildrenIfPossible(op, newChildren)
+                            hasChanged = True
+                            modified = True
+                    i += 1
 
-        # simplify e & ~e to 0 and e | ~e to 1
-        i = 0
-        while i < len(newChildren):
-            child0 = newChildren[i]
-            j = i + 1
-            while j < len(newChildren):
-                child1 = newChildren[j]
-                if child0.op == '~' and equivalence(child0.children[0], child1) or child1.op == '~' and equivalence(child0, child1.children[0]):
-                    return setSimpEqAndReturn(node, cst0)
-                else:
-                    j += 1
-            i += 1
+            # simplify a | (~a & b) to a | b
+            #          a & (~a | b) to a & b
+            if extendedSimplifyEnable():
+                i = 0
+                while i < len(newChildren):
+                    child0 = newChildren[i]
+                    if child0.op == op1:
+                        j = 0
+                        idxToRemove = set()
+                        while j < len(child0.children):
+                            op1Child = child0.children[j]
+                            if op1Child.op == '~':
+                                op1gChild = op1Child.children[0]
+                                if op1gChild.op == op:
+                                    allPresent = True
+                                    for op1ggChild in op1gChild.children:
+                                        found = False
+                                        k = 0
+                                        while k < len(newChildren):
+                                            if i == k:
+                                                k += 1
+                                                continue
+                                            if equivalence(op1ggChild, newChildren[k]):
+                                                found = True
+                                                break
+                                            k += 1
+                                        allPresent = allPresent and found
+                                        if not allPresent:
+                                            break
+                                    if allPresent:
+                                        idxToRemove.add(j)
+                                else:
+                                    k = 0
+                                    while k < len(newChildren):
+                                        if i == k:
+                                            k += 1
+                                            continue
+                                        child1 = newChildren[k]
+                                        if equivalence(child1, op1gChild):
+                                            idxToRemove.add(j)
+                                            break
+                                        k += 1
+                            else:
+                                k = 0
+                                while k < len(newChildren):
+                                    if i == k:
+                                        k += 1
+                                        continue
+                                    child1 = newChildren[k]
+                                    if child1.op == '~' and equivalence(child1.children[0], op1Child):
+                                        idxToRemove.add(j)
+                                        break
+                                    k += 1
+                            j += 1
+                        if len(idxToRemove) != 0:
+                            newGrandChildren = []
+                            for idx in range(len(child0.children)):
+                                if idx not in idxToRemove:
+                                    newGrandChildren.append(child0.children[idx])
+                            if len(newGrandChildren) == 0:
+                                newChild = cst1
+                            elif len(newGrandChildren) == 1:
+                                newChild = newGrandChildren[0]
+                            else:
+                                newChild = OpNode(op1, newGrandChildren)
+                            newChildren[i] = newChild
+                            newChildren, m = mergeWithChildrenIfPossible(op, newChildren)
+                            hasChanged = True
+                            modified = True
+                    i += 1
+            else:
+                i = 0
+                while i < len(newChildren):
+                    child0 = newChildren[i]
+                    if child0.op == op1:
+                        j = 0
+                        idxToRemove = set()
+                        while j < len(child0.children):
+                            op1Child = child0.children[j]
+                            k = 0
+                            while k < len(newChildren):
+                                if i == k:
+                                    k += 1
+                                    continue
+                                child1 = newChildren[k]
+                                if (child1.op == '~' and equivalence(child1.children[0], op1Child)) or (op1Child.op == '~' and equivalence(child1, op1Child.children[0])):
+                                    idxToRemove.add(j)
+                                    break
+                                k += 1
+                            j += 1
+                        if len(idxToRemove) != 0:
+                            newGrandChildren = []
+                            for idx in range(len(child0.children)):
+                                if idx not in idxToRemove:
+                                    newGrandChildren.append(child0.children[idx])
+                            if len(newGrandChildren) == 0:
+                                newChild = cst1
+                            elif len(newGrandChildren) == 1:
+                                newChild = newGrandChildren[0]
+                            else:
+                                newChild = OpNode(op1, newGrandChildren)
+                            newChildren[i] = newChild
+                            newChildren, m = mergeWithChildrenIfPossible(op, newChildren)
+                            hasChanged = True
+                            modified = True
+                    i += 1
 
         # simplify e | 0 to e, e | 1 to 1
         # simplify e & 0 to 0, e & 1 to e
@@ -1192,24 +1526,35 @@ def simplifyCore(node, propagateExtractInwards, useSingleBitVariables):
             i += 1
 
         # Factorization
-        #print('children avant factorize (%s): [ ' % op + ', '.join(map(lambda x: '%s' % x, newChildren)) + ' ]')
-        m = factorize(op1, op, newChildren, width)
+        m = factorize(op1, op, newChildren, width, usbv=useSingleBitVariables)
         modified = modified or m
-        #print('children apres factorize (%s): [ ' % op + ', '.join(map(lambda x: '%s' % x, newChildren)) + ' ]')
 
-        if constVal == cst0.cst:
+        if (op == '&' and constVal == 0) or (op == '|' and constVal == (1 << width) - 1):
             return setSimpEqAndReturn(node, cst0)
-        if constVal != cst1.cst:
-            # modified already set to True in while loop
+        if len(newChildren) == 0 or ((op == '&' and constVal != (1 << width) - 1) or (op == '|' and constVal != 0)):
             newChildren.append(Const(constVal, width))
 
         # Final considerations
         if len(newChildren) == 0:
             return setSimpEqAndReturn(node, Const(0, width))
         if len(newChildren) == 1:
-            # Suppressing '&' or '|' node
             return setSimpEqAndReturn(node, newChildren[0])
         else:
+            if extendedSimplifyEnable():
+                # De Morgan
+                # (~a & ~b & ~c) -> ~(a | b | c)
+                # (~a | ~b | ~c) -> ~(a & b & c)
+                allChildrenBnot = True
+                for c in newChildren:
+                    if c.op != '~':
+                        allChildrenBnot = False
+                        break
+                if allChildrenBnot:
+                    newGrandChildren = []
+                    for c in newChildren:
+                        newGrandChildren.append(c.children[0])
+                    op1Node = simplifyCore(~OpNode(op1, newGrandChildren), usbv=useSingleBitVariables)
+                    return setSimpEqAndReturn(node, op1Node)
             return setSimpEqAndReturn(node, defaultNode(node, op, newChildren, modified))
 
 
@@ -1236,6 +1581,44 @@ def simplifyCore(node, propagateExtractInwards, useSingleBitVariables):
                 gChild = exp.children[0]
                 sh1 = exp.children[1]
                 return setSimpEqAndReturn(node, gChild << (sh0.cst + sh1.cst))
+            elif exp.op == 'C':
+                singleBitOrCst = True
+                for gChild in exp.children:
+                    if gChild.width != 1 and not isinstance(gChild, ConstNode):
+                        singleBitOrCst = False
+                        break
+                if singleBitOrCst:
+                    singleBitChildren = []
+                    for gChild in exp.children:
+                        if isinstance(gChild, ConstNode):
+                            for i in range(gChild.width):
+                                singleBitChildren.append(Const((gChild.cst >> i) & 1, 1))
+                        else:
+                            singleBitChildren.append(gChild)
+                    total = len(singleBitChildren)
+                    sh = sh0.cst
+                    newChildrenShifted = [Const(0, 1) for _ in range(min(sh, total))]
+                    newChildrenShifted.extend(singleBitChildren[:max(0, total - sh)])
+                    newChildrenMerged = []
+                    v = []
+                    i = 0
+                    size = len(newChildrenShifted)
+                    while i < size:
+                        while i != size and isinstance(newChildrenShifted[i], ConstNode):
+                            v.append(newChildrenShifted[i])
+                            i += 1
+                        if len(v) != 0:
+                            cst_val = 0
+                            for idx, cb in enumerate(v):
+                                cst_val |= (cb.cst << idx)
+                            newChildrenMerged.append(Const(cst_val, len(v)))
+                            v = []
+                        if i == size:
+                            break
+                        newChildrenMerged.append(newChildrenShifted[i])
+                        i += 1
+                    res = OpNode('C', newChildrenMerged) if len(newChildrenMerged) > 1 else newChildrenMerged[0]
+                    return setSimpEqAndReturn(node, res)
             return setSimpEqAndReturn(node, defaultNode(node, op, newChildren, modified))
 
 
@@ -1249,6 +1632,45 @@ def simplifyCore(node, propagateExtractInwards, useSingleBitVariables):
                 gChild = exp.children[0]
                 sh1 = exp.children[1]
                 return setSimpEqAndReturn(node, gChild >> (sh0.cst + sh1.cst))
+            elif exp.op == 'C':
+                singleBitOrCst = True
+                for gChild in exp.children:
+                    if gChild.width != 1 and not isinstance(gChild, ConstNode):
+                        singleBitOrCst = False
+                        break
+                if singleBitOrCst:
+                    singleBitChildren = []
+                    for gChild in exp.children:
+                        if isinstance(gChild, ConstNode):
+                            for i in range(gChild.width):
+                                singleBitChildren.append(Const((gChild.cst >> i) & 1, 1))
+                        else:
+                            singleBitChildren.append(gChild)
+                    total = len(singleBitChildren)
+                    sh = sh0.cst
+                    newChildrenShifted = singleBitChildren[sh:total]
+                    signBit = singleBitChildren[-1]
+                    newChildrenShifted.extend([signBit] * min(sh, total))
+                    newChildrenMerged = []
+                    v = []
+                    i = 0
+                    size = len(newChildrenShifted)
+                    while i < size:
+                        while i != size and isinstance(newChildrenShifted[i], ConstNode):
+                            v.append(newChildrenShifted[i])
+                            i += 1
+                        if len(v) != 0:
+                            cst_val = 0
+                            for idx, cb in enumerate(v):
+                                cst_val |= (cb.cst << idx)
+                            newChildrenMerged.append(Const(cst_val, len(v)))
+                            v = []
+                        if i == size:
+                            break
+                        newChildrenMerged.append(newChildrenShifted[i])
+                        i += 1
+                    res = OpNode('C', newChildrenMerged) if len(newChildrenMerged) > 1 else newChildrenMerged[0]
+                    return setSimpEqAndReturn(node, res)
             return setSimpEqAndReturn(node, defaultNode(node, op, newChildren, modified))
 
 
@@ -1262,13 +1684,121 @@ def simplifyCore(node, propagateExtractInwards, useSingleBitVariables):
                 gChild = exp.children[0]
                 sh1 = exp.children[1]
                 return setSimpEqAndReturn(node, LShR(gChild, sh0.cst + sh1.cst))
+            elif exp.op == 'C':
+                singleBitOrCst = True
+                for gChild in exp.children:
+                    if gChild.width != 1 and not isinstance(gChild, ConstNode):
+                        singleBitOrCst = False
+                        break
+                if singleBitOrCst:
+                    singleBitChildren = []
+                    for gChild in exp.children:
+                        if isinstance(gChild, ConstNode):
+                            for i in range(gChild.width):
+                                singleBitChildren.append(Const((gChild.cst >> i) & 1, 1))
+                        else:
+                            singleBitChildren.append(gChild)
+                    total = len(singleBitChildren)
+                    sh = sh0.cst
+                    newChildrenShifted = singleBitChildren[sh:total]
+                    newChildrenShifted.extend([Const(0, 1)] * min(sh, total))
+                    newChildrenMerged = []
+                    v = []
+                    i = 0
+                    size = len(newChildrenShifted)
+                    while i < size:
+                        while i != size and isinstance(newChildrenShifted[i], ConstNode):
+                            v.append(newChildrenShifted[i])
+                            i += 1
+                        if len(v) != 0:
+                            cst_val = 0
+                            for idx, cb in enumerate(v):
+                                cst_val |= (cb.cst << idx)
+                            newChildrenMerged.append(Const(cst_val, len(v)))
+                            v = []
+                        if i == size:
+                            break
+                        newChildrenMerged.append(newChildrenShifted[i])
+                        i += 1
+                    res = OpNode('C', newChildrenMerged) if len(newChildrenMerged) > 1 else newChildrenMerged[0]
+                    return setSimpEqAndReturn(node, res)
             return setSimpEqAndReturn(node, defaultNode(node, op, newChildren, modified))
 
 
+    elif op == 's<<':
+        val = newChildren[0]
+        shval = newChildren[1]
+        if isinstance(val, ConstNode):
+            if isZero(val, val.width):
+                return setSimpEqAndReturn(node, val)
+            elif isAllOne(val, val.width) and (1 << shval.width) <= val.width:
+                maxShiftedValue = (1 << shval.width) - 1
+                allOneWidth = val.width - maxShiftedValue
+                result = Concat(Const((1 << allOneWidth) - 1, allOneWidth),
+                                Const((1 << (val.width - allOneWidth)) - 1, val.width - allOneWidth) << shval)
+                return setSimpEqAndReturn(node, result)
+        if isinstance(shval, ConstNode):
+            if isZero(shval, shval.width):
+                return setSimpEqAndReturn(node, val)
+            else:
+                if val.op == '<<':
+                    gChild = val.children[0]
+                    sh1 = val.children[1]
+                    return setSimpEqAndReturn(node, gChild << (shval.cst + sh1.cst))
+                return setSimpEqAndReturn(node, val << shval)
+        return setSimpEqAndReturn(node, defaultNode(node, op, newChildren, modified))
+
+
+    elif op == 's>>':
+        val = newChildren[0]
+        shval = newChildren[1]
+        if isinstance(val, ConstNode):
+            if isZero(val, val.width) or isAllOne(val, val.width):
+                return setSimpEqAndReturn(node, val)
+        if isinstance(shval, ConstNode):
+            if isZero(shval, shval.width):
+                return setSimpEqAndReturn(node, val)
+            else:
+                if val.op == '>>':
+                    gChild = val.children[0]
+                    sh1 = val.children[1]
+                    return setSimpEqAndReturn(node, gChild >> (shval.cst + sh1.cst))
+                return setSimpEqAndReturn(node, val >> shval)
+        return setSimpEqAndReturn(node, defaultNode(node, op, newChildren, modified))
+
+
+    elif op == 'SLS':
+        val = newChildren[0]
+        shval = newChildren[1]
+        if isinstance(val, ConstNode):
+            if isZero(val, val.width):
+                return setSimpEqAndReturn(node, val)
+            elif isAllOne(val, val.width) and (1 << shval.width) <= val.width:
+                maxShiftedValue = (1 << shval.width) - 1
+                allOneWidth = val.width - maxShiftedValue
+                result = Concat(LShR(Const((1 << (val.width - allOneWidth)) - 1, val.width - allOneWidth), shval),
+                                Const((1 << allOneWidth) - 1, allOneWidth))
+                return setSimpEqAndReturn(node, result)
+        if isinstance(shval, ConstNode):
+            if isZero(shval, shval.width):
+                return setSimpEqAndReturn(node, val)
+            else:
+                if val.op == 'LS':
+                    gChild = val.children[0]
+                    sh1 = val.children[1]
+                    return setSimpEqAndReturn(node, LShR(gChild, shval.cst + sh1.cst))
+                return setSimpEqAndReturn(node, LShR(val, shval))
+        return setSimpEqAndReturn(node, defaultNode(node, op, newChildren, modified))
+
+
     elif op == 'E':
+        # FIXME: propagate in verif_msi
         if modified:
             newNode = Extract(newChildren[0], newChildren[1], newChildren[2])
-            return setSimpEqAndReturn(node, simplifyExtract(newNode))
+            if isinstance(newNode, ConstNode):
+                return setSimpEqAndReturn(node, newNode)
+            else:
+                return setSimpEqAndReturn(node, simplifyExtract(newNode))
         else:
             return setSimpEqAndReturn(node, simplifyExtract(node))
 
@@ -1342,16 +1872,27 @@ def simplifyCore(node, propagateExtractInwards, useSingleBitVariables):
                 if child.op == 'E' and child.children[1].cst == currentBit:
                     currentBit = child.children[0].cst + 1
                 else:
-                    return setSimpEqAndReturn(node, defaultNode(node, op, newChildren, modified))
-            # Checking if all children are equivalent expressions
-            for childNum in range(1, len(newChildren)):
-                if not equivalence(newChildren[0].children[2], newChildren[childNum].children[2]):
-                    return setSimpEqAndReturn(node, defaultNode(node, op, newChildren, modified))
-
-            if firstBit == 0 and currentBit == newChildren[0].children[2].width:
-                return setSimpEqAndReturn(node, newChildren[0].children[2])
+                    break
             else:
-                return setSimpEqAndReturn(node, Extract(currentBit - 1, firstBit, newChildren[0].children[2]))
+                # Checking if all children are equivalent expressions
+                allEquiv = True
+                for childNum in range(1, len(newChildren)):
+                    if not equivalence(newChildren[0].children[2], newChildren[childNum].children[2]):
+                        allEquiv = False
+                        break
+
+                if allEquiv:
+                    if firstBit == 0 and currentBit == newChildren[0].children[2].width:
+                        return setSimpEqAndReturn(node, newChildren[0].children[2])
+                    else:
+                        return setSimpEqAndReturn(node, Extract(currentBit - 1, firstBit, newChildren[0].children[2]))
+
+        if extendedMergeConcatEnable():
+            mergedNode, ok = extendedMergeConcatExtract(newChildren)
+            if ok:
+                return setSimpEqAndReturn(node, mergedNode)
+            else:
+                return setSimpEqAndReturn(node, defaultNode(node, op, newChildren, modified))
 
         return setSimpEqAndReturn(node, defaultNode(node, op, newChildren, modified))
 

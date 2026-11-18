@@ -1,15 +1,15 @@
-#!/usr/bin/python
-
-from __future__ import print_function
-
+#!/usr/bin/env python3
+# This file was automatically ported from VerifMSI++
 from verif_msi import *
+import random
 
-m = symbol('m', 'M', 3)
-k = symbol('k', 'S', 3)
-p = symbol('p', 'P', 3)
-a = ArrayExp('a', 3, 3, None, None, None, None)
+k = symbol("k", 'S', 3)
+m = symbol("m", 'M', 3)
+p = symbol("p", 'P', 3)
 
-e = m ^ a[((k ^ m) << 1) ^ (m << 1) ^ p]
+a = ArrayExp("a", 3, 3)
 
-checkTpsResult(e, True)
+n = m ^ a[((k ^ m) << 1) ^ (m << 1) ^ p]
+
+checkTpsResult(n, True)
 

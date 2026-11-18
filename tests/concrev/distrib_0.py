@@ -1,73 +1,65 @@
-#!/usr/bin/python
-
-from __future__ import print_function
-
+#!/usr/bin/env python3
+# This file was automatically ported from VerifMSI++
 from verif_msi import *
+import random
 
-
-m0 = symbol('m0', 'M', 4)
-m1 = symbol('m1', 'M', 4)
-m2 = symbol('m2', 'M', 2)
-k0 = symbol('k0', 'S', 4)
-
+m0 = symbol("m0", 'M', 4)
+m1 = symbol("m1", 'M', 4)
+m2 = symbol("m2", 'M', 2)
+k0 = symbol("k0", 'S', 4)
 
 e0 = k0 ^ m0
+rud
+sid = getDistribWithExev(e0, rud)
 
-rud, sid = getDistribWithExev(e0)
 if rud and sid:
-    print('OK')
+    print("OK")
 else:
-    print('KO')
+    print("KO")
 
 
+e1 = k0 & m0
 
-e0 = k0 & m0
-
-rud, sid = getDistribWithExev(e0)
+sid = getDistribWithExev(e1, rud)
 if not rud and not sid:
-    print('OK')
+    print("OK")
 else:
-    print('KO')
+    print("KO")
 
 
+e2 = k0 ^ m0 ^ m1
 
-e0 = k0 ^ m0 ^ m1
-
-rud, sid = getDistribWithExev(e0)
+sid = getDistribWithExev(e2, rud)
 if rud and sid:
-    print('OK')
+    print("OK")
 else:
-    print('KO')
+    print("KO")
 
 
+e3 = k0 ^ m0 ^ (ZeroExt(2, m2))
 
-e0 = k0 ^ m0 ^ (ZeroExt(2, m2))
-
-rud, sid = getDistribWithExev(e0)
+sid = getDistribWithExev(e3, rud)
 if rud and sid:
-    print('OK')
+    print("OK")
 else:
-    print('KO')
+    print("KO")
 
 
+e4 = (k0 ^ m0) & m1
 
-e0 = (k0 ^ m0) & m1
-
-rud, sid = getDistribWithExev(e0)
+sid = getDistribWithExev(e4, rud)
 if not rud and sid:
-    print('OK')
+    print("OK")
 else:
-    print('KO')
+    print("KO")
 
 
+# if using e0 instead of using a new alias, strange bug
+e5 = k0
 
-e0 = k0
-
-rud, sid = getDistribWithExev(e0)
+sid = getDistribWithExev(e5, rud)
 if not rud and not sid:
-    print('OK')
+    print("OK")
 else:
-    print('KO')
-
-
+    print("KO")
 

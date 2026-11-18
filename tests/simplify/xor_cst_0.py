@@ -1,11 +1,11 @@
-#!/usr/bin/python
-
-from __future__ import print_function
-
+#!/usr/bin/env python3
+# This file was automatically ported from VerifMSI++
 from verif_msi import *
+import random
 
-p = symbol('p', 'P', 8)
-q = symbol('q', 'P', 8)
+
+p = symbol("p", 'P', 8)
+q = symbol("q", 'P', 8)
 
 c0 = constant(0xA0, 8)
 c1 = constant(0x0A, 8)
@@ -13,9 +13,7 @@ c2 = constant(0xAA, 8)
 
 n = c0 ^ p ^ c1 ^ q ^ c2
 
-# result is 0
-wres = p ^ q
+res = p ^ q
 
-checkResults(n, wres)
-
+checkResults(n, res)
 

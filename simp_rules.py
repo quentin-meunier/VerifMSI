@@ -181,6 +181,8 @@ def copyExp(e, orig, target):
 
     def copyExpRec(trg):
         if isinstance(trg, SymbNode):
+            if trg not in mapping:
+                return None
             return mapping[trg]
         if isinstance(trg, ConstNode):
             return trg
@@ -190,6 +192,8 @@ def copyExp(e, orig, target):
         children = []
         for c in trg.children:
             newChild = copyExpRec(c)
+            if newChild is None:
+                return None
             children.append(newChild)
         n = OpNode(trg.op, children)
         return n

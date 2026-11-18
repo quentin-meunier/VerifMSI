@@ -1,20 +1,19 @@
-#!/usr/bin/python
-
-from __future__ import print_function
-
+#!/usr/bin/env python3
+# This file was automatically ported from VerifMSI++
 from verif_msi import *
+import random
 
-p0 = symbol('p0', 'S', 3)
-p1 = symbol('p1', 'S', 3)
-p2 = symbol('p2', 'S', 3)
-p3 = symbol('p3', 'S', 3)
 
-f = p0 & p1 & p2 & p3
-e = p0 ^ p0 ^ f
-n = ~e | (e >> 1)
+s0 = symbol("p0", 'S', 3)
+s1 = symbol("p1", 'S', 3)
+s2 = symbol("p2", 'S', 3)
+s3 = symbol("p3", 'S', 3)
 
-n.dump('graph.dot')
+f = s0 & s1 & s2 & s3
+e = s0 ^ s0 ^ f
+n = getBitDecomposition((e << 2) & (LShR(e, 1)))
 
-res = checkTpsVal(n)
+# n.dump("graph.dot");
 
+checkResults(n, constant(0, 3))
 

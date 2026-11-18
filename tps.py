@@ -4,11 +4,13 @@
 # SPDX-License-Identifier: GPL-3.0-only
 # Author(s): Quentin L. Meunier
 
+import sys
+
 from .config import *
 from .utils import *
 from .node import *
 from .simplify import *
-
+from .concrev import secPropValidity, isTPSWithExev, isNIWithExev, isRNIWithExev, isPINIWithExev, isOPINIWithExev
 
 
 def getReplacedGraph(node, selMask, childToReplace):
@@ -26,7 +28,6 @@ def getReplacedGraph(node, selMask, childToReplace):
             if child is childToReplace:
                 children.append(selMask)
                 continue
-            #if selMask in child.maskVarOcc:
             if selMask in child.maskingMaskOcc or selMask in child.otherMaskOcc:
                 newChild = getReplacedGraphRec(child, selMask, childToReplace, m)
                 children.append(newChild)
@@ -39,48 +40,129 @@ def getReplacedGraph(node, selMask, childToReplace):
     return getReplacedGraphRec(node, selMask, childToReplace, {})
 
 
+def removeConstOperandsFromPlusRec(node, m):
+    if not isinstance(node, OpNode) or not node.hasPlus:
+        return node
+    children = []
+    for child in node.children:
+        if child in m:
+            children.append(m[child])
+            continue
+        if node.op == '+' and isinstance(child, ConstNode):
+            continue
+        newChild = removeConstOperandsFromPlusRec(child, m)
+        children.append(newChild)
+    if children == list(node.children):
+        m[node] = node
+        return node
+    if len(children) == 0:
+        assert False
+        n = Const(0, node.width)
+        m[node] = n
+        return n
+    if len(node.children) != len(children) and len(children) == 1:
+        assert node.op == '+'
+        n = children[0]
+        m[node] = n
+        return n
+    n = OpNode(node.op, children)
+    m[node] = n
+    return n
 
-def tps(nodeIn, verbose = False):
-    if len(nodeIn.shareOcc) != 0:
-        print('*** Error: Threshold Probing verification should not use a share representation but explicit secret variables and masks')
-        sys.exit(1)
-    return checkProperty(nodeIn, 'tps', None, verbose)
+
+def removeConstOperandsFromPlus(node):
+    if not node.hasPlus:
+        return node
+    m = {}
+    res = removeConstOperandsFromPlusRec(node, m)
+    if res is not node:
+        return simplify(res)
+    return node
 
 
-def ni(nodeIn, maxShareOcc, verbose = False):
-    if len(nodeIn.secretVarOcc) != 0:
-        print('*** Error: NI verification should use a share representation and not explicit secret variables')
-        sys.exit(1)
-    return checkProperty(nodeIn, 'ni', maxShareOcc, verbose)
+def checkPropertyWrapper(nodeIn, secProp, params, bitDecompose=False, noFalsePositive=False, verbose=False):
+    if isinstance(nodeIn, (list, tuple, set)):
+        nodes = [simplify(n, usbv=bitDecompose) for n in nodeIn]
+        c = simplify(Concat(*nodes[::-1]) if len(nodes) > 1 else nodes[0])
+    else:
+        c = simplify(nodeIn, usbv=bitDecompose)
+    return checkProperty(c, secProp, params, noFalsePositive, verbose)
 
 
-def rni(nodeIn, diff, verbose = False):
-    if len(nodeIn.secretVarOcc) != 0:
-        print('*** Error: RNI verification should use a share representation and not explicit secret variables')
-        sys.exit(1)
-    return checkProperty(nodeIn, 'rni', diff, verbose)
+def tps(nodeIn, bitDecompose=False, verbose=False):
+    secPropValidity(nodeIn, TPS)
+    return checkPropertyWrapper(nodeIn, TPS, None, bitDecompose, False, verbose)
 
 
-def pini(nodeIn, params, verbose = False):
-    if len(nodeIn.secretVarOcc) != 0:
-        print('*** Error: PINI verification should use a share representation and not explicit secret variables')
-        sys.exit(1)
-    return checkProperty(nodeIn, 'pini', params, verbose)
+def tpsNoFalsePositive(nodeIn, bitDecompose=False, verbose=False):
+    secPropValidity(nodeIn, TPS)
+    return checkPropertyWrapper(nodeIn, TPS, None, bitDecompose, True, verbose)
 
 
-def opini(nodeIn, params, verbose = False):
-    if len(nodeIn.secretVarOcc) != 0:
-        print('*** Error: OPINI verification should use a share representation and not explicit secret variables')
-        sys.exit(1)
+def ni(nodeIn, maxShareOcc, bitDecompose=False, verbose=False):
+    secPropValidity(nodeIn, NI)
+    return checkPropertyWrapper(nodeIn, NI, maxShareOcc, bitDecompose, False, verbose)
+
+
+def niNoFalsePositive(nodeIn, maxShareOcc, bitDecompose=False, verbose=False):
+    secPropValidity(nodeIn, NI)
+    return checkPropertyWrapper(nodeIn, NI, maxShareOcc, bitDecompose, True, verbose)
+
+
+def rni(nodeIn, diff, bitDecompose=False, verbose=False):
+    secPropValidity(nodeIn, RNI)
+    return checkPropertyWrapper(nodeIn, RNI, diff, bitDecompose, False, verbose)
+
+
+def rniNoFalsePositive(nodeIn, diff, bitDecompose=False, verbose=False):
+    secPropValidity(nodeIn, RNI)
+    return checkPropertyWrapper(nodeIn, RNI, diff, bitDecompose, True, verbose)
+
+
+def pini(nodeIn, maxShareOcc, outputIndexes=None, bitDecompose=False, verbose=False):
+    if isinstance(maxShareOcc, tuple):
+        outputIndexes = maxShareOcc[1]
+        maxShareOcc = maxShareOcc[0]
+    secPropValidity(nodeIn, PINI)
+    if isinstance(outputIndexes, int):
+        outputIndexes = {outputIndexes}
+    elif outputIndexes is None:
+        outputIndexes = set()
+    return checkPropertyWrapper(nodeIn, PINI, (maxShareOcc, outputIndexes), bitDecompose, False, verbose)
+
+
+def piniNoFalsePositive(nodeIn, maxShareOcc, outputIndexes=None, bitDecompose=False, verbose=False):
+    if isinstance(maxShareOcc, tuple):
+        outputIndexes = maxShareOcc[1]
+        maxShareOcc = maxShareOcc[0]
+    secPropValidity(nodeIn, PINI)
+    if isinstance(outputIndexes, int):
+        outputIndexes = {outputIndexes}
+    elif outputIndexes is None:
+        outputIndexes = set()
+    return checkPropertyWrapper(nodeIn, PINI, (maxShareOcc, outputIndexes), bitDecompose, True, verbose)
+
+
+def opini(nodeIn, maxShareOcc, outputIndexes=None, allOutputLeakages=None, bitDecompose=False, verbose=False):
+    if isinstance(maxShareOcc, tuple):
+        outputIndexes = maxShareOcc[1] if len(maxShareOcc) > 1 else None
+        allOutputLeakages = maxShareOcc[2] if len(maxShareOcc) > 2 else None
+        maxShareOcc = maxShareOcc[0]
+    secPropValidity(nodeIn, OPINI)
+    if isinstance(outputIndexes, int):
+        outputIndexes = {outputIndexes}
+    elif outputIndexes is None:
+        outputIndexes = set()
+    else:
+        outputIndexes = set(outputIndexes)
+    if allOutputLeakages is None:
+        allOutputLeakages = []
 
     additionalInputIndexes = set()
-    probesLeakagesWithNewOutputs = []
-    probesLeakagesWithNewOutputs.append(nodeIn)
-    maxShareOcc = params[0]
-    outputIndexes = set(params[1])
-    allOutputLeakages = params[2]
+    probesLeakagesWithNewOutputs = [nodeIn] if not isinstance(nodeIn, (list, tuple)) else list(nodeIn)
+
     while True:
-        res = checkProperty(Concat(*probesLeakagesWithNewOutputs), 'opini', (maxShareOcc, outputIndexes, additionalInputIndexes), verbose)
+        res = checkPropertyWrapper(probesLeakagesWithNewOutputs, OPINI, (maxShareOcc, outputIndexes, additionalInputIndexes), bitDecompose, False, verbose)
         if not res:
             return False
         elif len(additionalInputIndexes) == 0:
@@ -93,25 +175,57 @@ def opini(nodeIn, params, verbose = False):
         additionalInputIndexes.clear()
 
 
+def opiniNoFalsePositive(nodeIn, maxShareOcc, outputIndexes=None, allOutputLeakages=None, bitDecompose=False, verbose=False):
+    if isinstance(maxShareOcc, tuple):
+        outputIndexes = maxShareOcc[1] if len(maxShareOcc) > 1 else None
+        allOutputLeakages = maxShareOcc[2] if len(maxShareOcc) > 2 else None
+        maxShareOcc = maxShareOcc[0]
+    secPropValidity(nodeIn, OPINI)
+    if isinstance(outputIndexes, int):
+        outputIndexes = {outputIndexes}
+    elif outputIndexes is None:
+        outputIndexes = set()
+    else:
+        outputIndexes = set(outputIndexes)
+    if allOutputLeakages is None:
+        allOutputLeakages = []
+
+    additionalInputIndexes = set()
+    probesLeakagesWithNewOutputs = [nodeIn] if not isinstance(nodeIn, (list, tuple)) else list(nodeIn)
+
+    while True:
+        res = checkPropertyWrapper(probesLeakagesWithNewOutputs, OPINI, (maxShareOcc, outputIndexes, additionalInputIndexes), bitDecompose, True, verbose)
+        if not res:
+            return False
+        elif len(additionalInputIndexes) == 0:
+            return True
+        maxShareOcc = maxShareOcc - len(additionalInputIndexes)
+        for idx in additionalInputIndexes:
+            outputIndexes.add(idx)
+            for output in allOutputLeakages:
+                probesLeakagesWithNewOutputs.append(output[idx])
+        additionalInputIndexes.clear()
 
 
-def checkProperty(nodeIn, secProp, params, verbose):
+def checkProperty(nodeIn, secProp, params, noFalsePositive=False, verbose=False):
     if verbose:
         print('# Call func tps on exp %s' % nodeIn)
 
-    if secProp == 'ni':
+    if secProp == NI or secProp == 'ni':
         maxShareOcc = params
-    elif secProp == 'rni':
-        diff = params # Difference between the order of verification and the n-uplet size
-    elif secProp == 'pini':
-        maxSharesIndicesNum = params[0]
-        outputSharesIndices = params[1]
-    elif secProp == 'opini':
-        maxSharesIndicesNum = params[0]
-        outputSharesIndices = params[1]
+    elif secProp == RNI or secProp == 'rni':
+        diff = params
+    elif secProp == PINI or secProp == 'pini':
+        maxShareOcc = params[0]
+        outputIndexes = params[1]
+    elif secProp == OPINI or secProp == 'opini':
+        maxShareOcc = params[0]
+        outputIndexes = params[1]
         additionalInputIndexes = params[2]
 
-    node = simplify(nodeIn)
+    node = nodeIn
+    if verifRemoveCstInAddEnable():
+        node = removeConstOperandsFromPlus(node)
 
     masksTaken = set()
     cpt = 0
@@ -121,51 +235,46 @@ def checkProperty(nodeIn, secProp, params, verbose):
             print('# e = %s' % node)
         cpt += 1
 
-        if secProp == 'tps':
+        if secProp == TPS or secProp == 'tps':
             if len(node.secretVarOcc) == 0:
                 if verbose:
                     print('# No more secret')
                 return True
-        elif secProp == 'ni':
+        elif secProp == NI or secProp == 'ni':
             isNI = True
             for s in node.shareOcc:
-                #print('len(node.shareOcc[s]) : %d - maxShareOcc : %d' % (len(node.shareOcc[s]), maxShareOcc));
                 if len(node.shareOcc[s]) > maxShareOcc:
                     isNI = False
                     break
             if isNI:
                 return True
-        elif secProp == 'rni':
+        elif secProp == RNI or secProp == 'rni':
             isRNI = True
             for s in node.shareOcc:
-                for anyOcc in node.shareOcc[s]:
-                    nbShares = anyOcc.nbShares
-                    break
-                if len(node.shareOcc[s]) >= nbShares - diff:
+                nbTotalShares = s.nbShares if s.nbShares is not None else next(iter(node.shareOcc[s])).nbShares
+                if len(node.shareOcc[s]) + diff >= nbTotalShares:
                     isRNI = False
                     break
             if isRNI:
                 return True
-        elif secProp == 'pini':
-            #print('# outputSharesIndices: %s' % ' '.join(map(lambda x: '%d' % x, outputSharesIndices)))
-            internalSharesIndices = set()
+        elif secProp == PINI or secProp == 'pini':
+            internalSharesIndexes = set()
             for s in node.shareOcc:
                 for sh in node.shareOcc[s]:
                     num = sh.shareNum
-                    if num not in outputSharesIndices:
-                        internalSharesIndices.add(num)
-            if len(internalSharesIndices) <= maxSharesIndicesNum:
+                    if num not in outputIndexes:
+                        internalSharesIndexes.add(num)
+            if len(internalSharesIndexes) <= maxShareOcc:
                 return True
-
 
         if len(node.currentlyMasking) != 0:
             if verbose:
                 print('# Masking mask, return True')
             return True
- 
+
         # Choice of CTR:
         # - Choose mask m which minimizes the number of nodes with occurrence of m (CTR Bases + other Occ)
-        # - For this m, choose CTR Base with the highest count
+        # - For this m, choose CTR Base with the lowest count
         # - For this CTR Base, choose the CTR with the max height for the same count
         maskingMaskOcc = node.maskingMaskOcc
         otherMaskOcc = node.otherMaskOcc
@@ -175,78 +284,93 @@ def checkProperty(nodeIn, secProp, params, verbose):
         selMask = None
         for m in maskingMaskOcc:
             nbMaskingOcc = len(maskingMaskOcc[m])
-
             try:
                 nbOtherOcc = len(otherMaskOcc[m])
-            except:
+            except Exception:
                 nbOtherOcc = 0
 
-            # FIXME: change the condition nbMaskingOcc == 1 with the fact that the number of maskingOcc has strictly decreased since the last time the mask was taken?
             if m in masksTaken and not (nbMaskingOcc == 1 and nbOtherOcc == 0):
                 continue
-            
+
             rootMask = (node.op == 'C' and m in node.children)
 
-            # Heuristic:
-            # 1. First, minimize the number of otherOcc
-            # 2. For the masks with a min number of otherOcc, minimize the number of maskingOcc
-            # (Old heuristic: minimize total number of occurrences)
             if (not rootMask and minRootMask) or (rootMask == minRootMask and (nbOtherOcc < minOtherOcc or (nbOtherOcc == minOtherOcc and nbMaskingOcc < minMaskingOcc))):
                 selMask = m
                 minRootMask = rootMask
                 minOtherOcc = nbOtherOcc
                 minMaskingOcc = nbMaskingOcc
 
-        if selMask == None:
-            if secProp == 'opini':
+        if selMask is None:
+            if secProp == OPINI or secProp == 'opini':
                 internalSharesIndexes = set()
                 for s in node.shareOcc:
                     for sh in node.shareOcc[s]:
                         num = sh.shareNum
-                        if num not in outputSharesIndices:
+                        if num not in outputIndexes:
                             internalSharesIndexes.add(num)
-                if len(internalSharesIndexes) > maxSharesIndicesNum:
+                if len(internalSharesIndexes) > maxShareOcc:
                     if verbose:
                         print('# No mask can be taken')
-                    return False
+                    if noFalsePositive:
+                        if verbose:
+                            print('# NoFalsePositive enabled, calling enumeration')
+                        return isOPINIWithExev(node, maxShareOcc, outputIndexes, additionalInputIndexes)
+                    else:
+                        return False
                 for num in internalSharesIndexes:
                     additionalInputIndexes.add(num)
                 return True
 
             if verbose:
                 print('# No mask can be taken')
+            if noFalsePositive:
+                if verbose:
+                    print('# NoFalsePositive enabled, calling enumeration')
+                if secProp == TPS or secProp == 'tps':
+                    return isTPSWithExev(node)
+                elif secProp == NI or secProp == 'ni':
+                    return isNIWithExev(node, maxShareOcc)
+                elif secProp == PINI or secProp == 'pini':
+                    return isPINIWithExev(node, maxShareOcc, outputIndexes)
+                elif secProp == RNI or secProp == 'rni':
+                    return isRNIWithExev(node, diff)
             return False
 
         if verbose:
             print('# Choosing mask %s (number of parent nodes: %d)' % (selMask, (minMaskingOcc + minOtherOcc)))
 
-        maxCount = 0
+        minCount = float('inf')
         selCtrBase = None
         occs = maskingMaskOcc[selMask]
         for ctrBase in occs:
-            if occs[ctrBase][ctrBase][0] > maxCount:
-                maxCount = occs[ctrBase][ctrBase][0]
+            count = occs[ctrBase][ctrBase][0]
+            if count < minCount:
+                minCount = count
                 selCtrBase = ctrBase
+        if selCtrBase is None:
+            for ctrBase in occs:
+                selCtrBase = ctrBase
+                break
 
         if verbose:
-            print('# Choosing following ctr base with %d occurrences: %s' % (maxCount, selCtrBase))
+            print('# Choosing following ctr base with %s occurrences: %s' % (minCount, selCtrBase))
 
         maxHeight = -1
         selCtr = None
-        for ctr in occs[selCtrBase]:
-            height = occs[selCtrBase][ctr][1]
-            if occs[selCtrBase][ctr][0] == maxCount and height > maxHeight:
-                maxHeight = height
-                selCtr = ctr
-        
+        if minCount == float('inf'):
+            selCtr = selCtrBase
+        else:
+            for ctr in occs[selCtrBase]:
+                count = occs[selCtrBase][ctr][0]
+                height = occs[selCtrBase][ctr][1]
+                if count == minCount and height > maxHeight:
+                    maxHeight = height
+                    selCtr = ctr
+
+        assert selCtr is not None
+
         if verbose:
             print('# Choosing following ctr with a height of %d: %s' % (maxHeight, selCtr))
-
-        # FIXME: currently the results is not deterministic, and a some verifications can either
-        #        succeed or fail, even if it is a very rare case
-        #        There are three non deterministic choices, and in order to make them deterministic,
-        #        we can for example take the min or max of the node number
-        #        I still expect this to slow down the execution time a little...
 
         masksTaken.add(selMask)
         node = getReplacedGraph(node, selMask, selCtr)
@@ -255,7 +379,6 @@ def checkProperty(nodeIn, secProp, params, verbose):
             print('# Replacing %s with %s' % (selCtr, selMask))
             print('# and other occurrences of %s with %s' % (selMask, selCtr))
 
-        # Simplify
         node = simplify(node)
-
-
+        if verifRemoveCstInAddEnable():
+            node = removeConstOperandsFromPlus(node)
